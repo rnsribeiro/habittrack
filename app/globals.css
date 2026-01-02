@@ -1,26 +1,165 @@
+/* app/globals.css */
 @import "tailwindcss";
 
+/* ===== Tokens (Light) ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* base */
+  --bg: #ffffff;
+  --fg: #0f172a;          /* slate-900 */
+  --muted: #334155;       /* slate-700 (mais legível que zinc-500) */
+  --muted-2: #475569;     /* slate-600 */
+
+  /* surfaces */
+  --card: #ffffff;
+  --border: #e5e7eb;      /* gray-200 */
+
+  /* inputs */
+  --input-bg: #f1f5ff;    /* bem leve azulado */
+  --input-fg: #0f172a;
+  --input-placeholder: #64748b; /* slate-500 */
+
+  /* accent */
+  --accent: #111827;      /* gray-900 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* ===== Tokens (Dark) ===== */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0b0f17;         /* mais suave que preto puro */
+    --fg: #e5e7eb;         /* gray-200 */
+    --muted: #cbd5e1;      /* slate-300 */
+    --muted-2: #94a3b8;    /* slate-400 */
+
+    --card: #0f1623;
+    --border: #1f2937;     /* gray-800 */
+
+    /* Mantemos inputs claros pra ficar MUITO legível no dark */
+    --input-bg: #f1f5ff;
+    --input-fg: #0f172a;
+    --input-placeholder: #64748b;
+
+    --accent: #e5e7eb;
   }
 }
 
+/* ===== Base ===== */
+html, body {
+  height: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Links */
+a {
+  color: inherit;
+}
+
+/* ===== Inputs sempre legíveis ===== */
+input,
+textarea,
+select {
+  color: var(--input-fg);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* Foco acessível */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); /* azul leve */
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+/* ===== Utilitários de tema (opcional usar em componentes) ===== */
+.ht-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.ht-muted {
+  color: var(--muted);
+}
+
+.ht-muted-2 {
+  color: var(--muted-2);
+}
+
+/* Ajuda quando o hábito tem cor muito clara (ex.: amarelo) */
+.ht-colored-title {
+  /* melhora legibilidade em cima de fundo claro */
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  -webkit-text-stroke: 0.25px rgba(0,0,0,0.18);
+}
+
+/* ===== Header / Buttons ===== */
+.ht-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.ht-app-title {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* botão base */
+.ht-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* hover */
+.ht-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* ativo */
+.ht-btn-active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
+/* botão sair */
+.ht-btn-danger {
+  color: #111827;
+  border-color: var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ht-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .ht-btn-active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+  }
+
+  .ht-btn-danger {
+    color: #e5e7eb;
+  }
 }
