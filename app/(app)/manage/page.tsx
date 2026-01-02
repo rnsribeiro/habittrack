@@ -146,13 +146,13 @@ export default function HabitsManagePage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
+                  {/* <button
                     disabled={busyId === h.id}
                     onClick={() => archiveHabit(h.id)}
-                    className="text-sm px-3 py-2 rounded-xl border bg-white hover:bg-zinc-50 disabled:opacity-60"
+                    className="text-sm px-3 py-2 rounded-xl border text-zinc-400 bg-white hover:bg-zinc-100"
                   >
                     Arquivar
-                  </button>
+                  </button> */}
                   <button
                     disabled={busyId === h.id}
                     onClick={() => deleteHabit(h.id)}

@@ -102,7 +102,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              className="w-full rounded-xl border py-2 bg-white hover:bg-zinc-50"
+              className="w-full rounded-xl border text-zinc-600 py-2 bg-white hover:bg-zinc-50"
               onClick={() => setMode(mode === "login" ? "signup" : "login")}
             >
               {mode === "login" ? "Criar uma conta" : "Já tenho conta"}
