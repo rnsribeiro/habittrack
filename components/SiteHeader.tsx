@@ -43,11 +43,13 @@ export function SiteHeader() {
 
           {/* Navegação */}
           <nav className="flex items-center gap-2">
-            <NavButton href="/habits" label="Visualizar" />            
+            <NavButton href="/habits" label="Hábitos" />            
             <NavButton href="/dashboard" label="Dashboard" />
-            <NavButton href="/tasks" label="Tarefas" />
             <NavButton href="/manage" label="Gerenciar" />
-
+            <span className="px-1">|</span>
+            <NavButton href="/tasks" label="Tarefas" />
+            <span className="px-1">|</span>
+            <NavButton href="/reading" label="Leitura" />
           </nav>
         </div>
 
