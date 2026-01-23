@@ -284,7 +284,7 @@ export default function TaskDetailsPage() {
         <div>
           <label className="text-sm text-zinc-700">Descrição/Notas</label>
           <textarea
-            className="w-full mt-1 border rounded-xl px-3 py-2 min-h-[110px]"
+            className="w-full mt-1 border rounded-xl px-3 py-2 min-h-27.5"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Detalhes…"
