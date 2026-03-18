@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { coerceTaskStatus, isTaskStatus } from "@/lib/tasks";
+import type { TaskStatus } from "@/lib/types";
 
 function getToken(req: NextRequest) {
   const h = req.headers.get("authorization") || "";
@@ -21,6 +23,23 @@ function parseCategory(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, 60) : null;
+}
+
+function parseTaskStatus(value: unknown, fallbackIsDone = false): TaskStatus {
+  if (value === undefined || value === null || value === "") {
+    return coerceTaskStatus(undefined, fallbackIsDone);
+  }
+
+  if (!isTaskStatus(value)) {
+    throw new Error("Invalid status");
+  }
+
+  return value;
+}
+
+function isMissingStatusColumn(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes("status") && (normalized.includes("column") || normalized.includes("schema cache"));
 }
 
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
@@ -65,9 +84,28 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!userRes?.user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
   const payload: Record<string, unknown> = {};
-  if (typeof body.title === "string") payload.title = body.title;
-  if (typeof body.notes === "string" || body.notes === null) payload.notes = body.notes;
-  if (typeof body.is_done === "boolean") payload.is_done = body.is_done;
+  if (typeof body.title === "string") {
+    const title = body.title.trim();
+    if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 });
+    payload.title = title;
+  }
+
+  if (typeof body.notes === "string" || body.notes === null) {
+    payload.notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
+  }
+
+  if (typeof body.status === "string") {
+    if (!isTaskStatus(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    payload.status = body.status;
+    payload.is_done = body.status === "done";
+  } else if (typeof body.is_done === "boolean") {
+    const status = parseTaskStatus(undefined, body.is_done);
+    payload.status = status;
+    payload.is_done = body.is_done;
+  }
 
   if (body.category === null || typeof body.category === "string") {
     const category = parseCategory(body.category);
@@ -92,13 +130,26 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (body.task_type === "scheduled") payload.scheduled_at = body.scheduled_at;
   }
 
-  const { data, error } = await supa
+  let { data, error } = await supa
     .from("tasks")
     .update(payload)
     .eq("id", id)
     .eq("user_id", userRes.user.id)
     .select("*")
     .single();
+
+  if (error && isMissingStatusColumn(error.message) && "status" in payload) {
+    const legacyPayload = { ...payload };
+    delete legacyPayload.status;
+
+    ({ data, error } = await supa
+      .from("tasks")
+      .update(legacyPayload)
+      .eq("id", id)
+      .eq("user_id", userRes.user.id)
+      .select("*")
+      .single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });

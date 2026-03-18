@@ -2,26 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TaskStatusControl } from "@/components/tasks/TaskStatusControl";
 import { getErrorMessage } from "@/lib/errors";
-import { useRequireSession } from "@/src/lib/useRequireSession";
-import { apiFetch } from "@/src/lib/api";
-import type { Task, TaskPriority, TaskType } from "@/lib/types";
 import {
   compareTasksByUrgency,
   formatTaskDateBR,
   formatTaskDateTimeBR,
+  getTaskStatus,
+  isTaskDone,
   isTaskForDay,
   isTaskOverdue,
   normalizeTaskCategory,
   priorityLabel,
   taskCategoryLabel,
+  taskStatusLabel,
   taskWhenLabel,
   typeLabel,
   UNCATEGORIZED_TASK_LABEL,
 } from "@/lib/tasks";
+import type { Task, TaskPriority, TaskStatus, TaskType } from "@/lib/types";
+import { apiFetch } from "@/src/lib/api";
+import { useRequireSession } from "@/src/lib/useRequireSession";
 
 type Filter = "all" | TaskType;
-type DoneFilter = "all" | "open" | "done";
+type StatusFilter = "all" | "open" | TaskStatus;
 type CategoryFilter = "all" | "__uncategorized__" | string;
 
 type CategoryPalette = {
@@ -101,53 +105,94 @@ function buildCategoryKey(category: string | null | undefined) {
 }
 
 function buildCategoryFilterLabel(value: CategoryFilter) {
-  if (value === "all") return "Todas as categorias";
-  if (value === "__uncategorized__") return UNCATEGORIZED_TASK_LABEL;
+  if (value === "all") return "todas as categorias";
+  if (value === "__uncategorized__") return UNCATEGORIZED_TASK_LABEL.toLowerCase();
   return value;
+}
+
+function buildStatusFilterLabel(value: StatusFilter) {
+  if (value === "all") return "todas";
+  if (value === "open") return "abertas";
+  return taskStatusLabel(value).toLowerCase();
 }
 
 function sortCategories(categories: { label: string; value: CategoryFilter }[]) {
   return [...categories].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 }
 
-function priorityTone(task: Task) {
+function matchesStatusFilter(task: Task, statusFilter: StatusFilter) {
+  if (statusFilter === "all") return true;
+  if (statusFilter === "open") return !isTaskDone(task);
+  return getTaskStatus(task) === statusFilter;
+}
+
+function cardTone(task: Task) {
   if (isTaskOverdue(task)) {
     return {
-      badge: "border-red-200 bg-red-50 text-red-700",
       card: "border-red-200/80 bg-red-50/90",
       dot: "#ef4444",
       helper: "text-red-700",
-      label: "Vencida",
+    };
+  }
+
+  const status = getTaskStatus(task);
+  if (status === "done") {
+    return {
+      card: "border-emerald-200/80 bg-emerald-50/85",
+      dot: "#22c55e",
+      helper: "text-emerald-700",
+    };
+  }
+
+  if (status === "in_progress") {
+    return {
+      card: "border-sky-200/80 bg-sky-50/85",
+      dot: "#0ea5e9",
+      helper: "text-sky-700",
     };
   }
 
   if (task.priority === "high") {
     return {
-      badge: "border-orange-200 bg-orange-50 text-orange-700",
       card: "border-orange-200/80 bg-orange-50/80",
       dot: "#f97316",
       helper: "text-orange-700",
-      label: "Alta prioridade",
     };
   }
 
   if (task.priority === "medium") {
     return {
-      badge: "border-sky-200 bg-sky-50 text-sky-700",
-      card: "border-sky-200/80 bg-sky-50/80",
-      dot: "#38bdf8",
-      helper: "text-sky-700",
-      label: "Prioridade media",
+      card: "border-violet-200/80 bg-violet-50/80",
+      dot: "#8b5cf6",
+      helper: "text-violet-700",
     };
   }
 
   return {
-    badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    card: "border-emerald-200/80 bg-emerald-50/70",
-    dot: "#22c55e",
-    helper: "text-emerald-700",
-    label: "Prioridade baixa",
+    card: "border-slate-200/80 bg-white/90",
+    dot: "#64748b",
+    helper: "text-slate-600",
   };
+}
+
+function statusBadgeClasses(task: Task) {
+  const status = getTaskStatus(task);
+
+  if (status === "done") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "in_progress") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function priorityBadgeClasses(priority: TaskPriority) {
+  if (priority === "high") return "border-orange-200 bg-orange-50 text-orange-700";
+  if (priority === "medium") return "border-violet-200 bg-violet-50 text-violet-700";
+  return "border-slate-200 bg-white/80 text-slate-700";
 }
 
 function CategoryBadge({
@@ -195,7 +240,6 @@ function renderAgendaList({
 
         {items.map((task) => {
           const palette = getCategoryPalette(taskCategoryLabel(task.category));
-          const tone = priorityTone(task);
 
           return (
             <div key={task.id} className="px-5 py-4">
@@ -210,11 +254,18 @@ function renderAgendaList({
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <CategoryBadge label={taskCategoryLabel(task.category)} palette={palette} />
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone.badge}`}>{tone.label}</span>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(task)}`}>
+                      {taskStatusLabel(task)}
+                    </span>
+                    {isTaskOverdue(task) ? (
+                      <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                        Vencida
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
-                <span className="text-xs text-slate-500">{taskWhenLabel(task)}</span>
+                <span className="text-right text-xs text-slate-500">{taskWhenLabel(task)}</span>
               </div>
             </div>
           );
@@ -228,30 +279,29 @@ function renderTaskCard({
   task,
   palette,
   router,
-  onToggleDone,
+  onStatusChange,
   onRemoveTask,
 }: {
   task: Task;
   palette: CategoryPalette;
   router: ReturnType<typeof useRouter>;
-  onToggleDone: (task: Task) => void;
+  onStatusChange: (task: Task, status: TaskStatus) => void;
   onRemoveTask: (taskId: string) => void;
 }) {
-  const tone = priorityTone(task);
+  const tone = cardTone(task);
+  const status = getTaskStatus(task);
+  const done = isTaskDone(task);
+  const overdue = isTaskOverdue(task);
 
   return (
     <article key={task.id} className={`rounded-[24px] border p-4 shadow-sm transition hover:-translate-y-0.5 ${tone.card}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-1 gap-3">
-          <input type="checkbox" checked={task.is_done} onChange={() => onToggleDone(task)} className="mt-1 h-4 w-4 shrink-0" />
-
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => router.push(`/tasks/${task.id}`)}
-                className={`text-left text-base font-semibold transition hover:text-emerald-700 ${
-                  task.is_done ? "text-slate-500 line-through" : "text-slate-900"
-                }`}
+                className={`text-left text-base font-semibold transition hover:text-emerald-700 ${done ? "text-slate-500 line-through" : "text-slate-900"}`}
               >
                 {task.title}
               </button>
@@ -260,18 +310,25 @@ function renderTaskCard({
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(task)}`}>
+                {taskStatusLabel(status)}
+              </span>
+              {overdue ? (
+                <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                  Vencida
+                </span>
+              ) : null}
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${priorityBadgeClasses(task.priority)}`}>
+                Prioridade {priorityLabel(task.priority).toLowerCase()}
+              </span>
               <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">
                 {typeLabel(task.task_type)}
-              </span>
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone.badge}`}>{tone.label}</span>
-              <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">
-                Prioridade {priorityLabel(task.priority).toLowerCase()}
               </span>
             </div>
 
             {task.notes ? <p className="mt-3 text-sm leading-6 text-slate-600">{task.notes}</p> : null}
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className={`flex items-center gap-2 text-sm font-medium ${tone.helper}`}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tone.dot }} />
                 {taskWhenLabel(task)}
@@ -283,11 +340,20 @@ function renderTaskCard({
               </div>
             </div>
           </div>
-        </div>
 
-        <button onClick={() => onRemoveTask(task.id)} className="app-btn app-btn-danger shrink-0">
+        <button onClick={() => onRemoveTask(task.id)} className="app-btn app-btn-danger w-full shrink-0 sm:w-auto">
           Excluir
         </button>
+      </div>
+
+        <div className="rounded-[20px] border border-white/80 bg-white/75 p-3">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status rapido</div>
+            <div className="text-xs text-slate-500">Atualize sem sair da lista.</div>
+          </div>
+
+          <TaskStatusControl value={status} onChange={(nextStatus) => onStatusChange(task, nextStatus)} />
+        </div>
       </div>
     </article>
   );
@@ -302,7 +368,7 @@ export default function TasksPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [filter, setFilter] = useState<Filter>("all");
-  const [doneFilter, setDoneFilter] = useState<DoneFilter>("open");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
   const [title, setTitle] = useState("");
@@ -310,16 +376,15 @@ export default function TasksPage() {
   const [category, setCategory] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("due");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>("todo");
   const [dueDate, setDueDate] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
     if (filter !== "all") params.set("type", filter);
-    if (doneFilter === "open") params.set("done", "false");
-    if (doneFilter === "done") params.set("done", "true");
     return params.toString();
-  }, [filter, doneFilter]);
+  }, [filter]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const tomorrow = useMemo(() => {
@@ -362,18 +427,23 @@ export default function TasksPage() {
     return categoryOptions.some((item) => item.value === categoryFilter) ? categoryFilter : "all";
   }, [categoryFilter, categoryOptions]);
 
+  const statusFilteredTasks = useMemo(
+    () => tasks.filter((task) => matchesStatusFilter(task, statusFilter)),
+    [statusFilter, tasks]
+  );
+
   const visibleTasks = useMemo(() => {
-    if (safeCategoryFilter === "all") return tasks;
+    if (safeCategoryFilter === "all") return statusFilteredTasks;
 
     if (safeCategoryFilter === "__uncategorized__") {
-      return tasks.filter((task) => !normalizeTaskCategory(task.category));
+      return statusFilteredTasks.filter((task) => !normalizeTaskCategory(task.category));
     }
 
-    return tasks.filter(
+    return statusFilteredTasks.filter(
       (task) =>
         normalizeTaskCategory(task.category)?.toLocaleLowerCase("pt-BR") === safeCategoryFilter.toLocaleLowerCase("pt-BR")
     );
-  }, [safeCategoryFilter, tasks]);
+  }, [safeCategoryFilter, statusFilteredTasks]);
 
   const groupedTasks = useMemo<CategoryGroup[]>(() => {
     const grouped = new Map<string, CategoryGroup>();
@@ -406,15 +476,15 @@ export default function TasksPage() {
   }, [visibleTasks]);
 
   const stats = useMemo(() => {
-    const open = tasks.filter((task) => !task.is_done).length;
-    const done = tasks.filter((task) => task.is_done).length;
+    const todo = tasks.filter((task) => getTaskStatus(task) === "todo").length;
+    const inProgress = tasks.filter((task) => getTaskStatus(task) === "in_progress").length;
+    const done = tasks.filter((task) => getTaskStatus(task) === "done").length;
     const overdue = tasks.filter((task) => isTaskOverdue(task)).length;
-    const categories = new Set(tasks.map((task) => buildCategoryKey(task.category))).size;
-    return { open, done, overdue, categories };
+    return { todo, inProgress, done, overdue };
   }, [tasks]);
 
   const agenda = useMemo(() => {
-    const openOnly = agendaTasks.filter((task) => !task.is_done);
+    const openOnly = agendaTasks.filter((task) => !isTaskDone(task));
     const todayList = openOnly.filter((task) => isTaskForDay(task, today)).sort(compareTasksByUrgency);
     const tomorrowList = openOnly.filter((task) => isTaskForDay(task, tomorrow)).sort(compareTasksByUrgency);
     return { todayList, tomorrowList };
@@ -451,6 +521,7 @@ export default function TasksPage() {
       category: category.trim() ? category.trim() : null,
       task_type: taskType,
       priority,
+      status: taskStatus,
     };
 
     if (taskType === "due") {
@@ -483,6 +554,7 @@ export default function TasksPage() {
       setCategory("");
       setTaskType("due");
       setPriority("medium");
+      setTaskStatus("todo");
       setDueDate("");
       setScheduledAt("");
     } catch (error: unknown) {
@@ -490,21 +562,24 @@ export default function TasksPage() {
     }
   }
 
-  async function toggleDone(task: Task) {
+  async function updateTaskStatus(task: Task, nextStatus: TaskStatus) {
+    if (getTaskStatus(task) === nextStatus) return;
+
     setErrorMsg(null);
 
     const snapshotTasks = tasks;
     const snapshotAgenda = agendaTasks;
 
-    setTasks((current) => current.map((item) => (item.id === task.id ? { ...item, is_done: !item.is_done } : item)));
-    setAgendaTasks((current) =>
-      current.map((item) => (item.id === task.id ? { ...item, is_done: !item.is_done } : item))
-    );
+    const applyStatus = (item: Task) =>
+      item.id === task.id ? { ...item, status: nextStatus, is_done: nextStatus === "done" } : item;
+
+    setTasks((current) => current.map(applyStatus));
+    setAgendaTasks((current) => current.map(applyStatus));
 
     try {
       const { task: updated } = await apiFetch(`/api/tasks/${task.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ is_done: !task.is_done }),
+        body: JSON.stringify({ status: nextStatus }),
       });
 
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
@@ -539,34 +614,34 @@ export default function TasksPage() {
 
   return (
     <div className="app-page pb-4">
-      <section className="app-surface-dark overflow-hidden p-6 sm:p-7">
+      <section className="app-surface-dark overflow-hidden p-5 sm:p-7">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
             <span className="app-kicker">Planejamento inteligente</span>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Tarefas por categoria e urgencia</h1>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Tarefas com estado real e foco mobile</h1>
             <p className="app-subtle-dark mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-              Agora as tarefas podem ser agrupadas por categoria, ordenadas pela urgencia e destacadas visualmente para ficar
-              mais facil decidir o que fazer primeiro.
+              Agora voce consegue separar o que ainda esta a fazer, o que ja esta em andamento e o que foi concluido,
+              mantendo o agrupamento por categoria e a leitura por urgencia.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[26rem] xl:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[28rem] xl:grid-cols-2">
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Abertas</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{stats.open}</div>
-              <div className="mt-1 text-sm text-slate-300">Tarefas ainda em andamento.</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">A fazer</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{stats.todo}</div>
+              <div className="mt-1 text-sm text-slate-300">Pendencias ainda nao iniciadas.</div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Em andamento</div>
+              <div className="mt-2 text-3xl font-semibold text-white">{stats.inProgress}</div>
+              <div className="mt-1 text-sm text-slate-300">Itens que ja ganharam tracao.</div>
             </div>
 
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Concluidas</div>
               <div className="mt-2 text-3xl font-semibold text-white">{stats.done}</div>
-              <div className="mt-1 text-sm text-slate-300">Itens resolvidos no filtro atual.</div>
-            </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Categorias</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{stats.categories}</div>
-              <div className="mt-1 text-sm text-slate-300">Grupos distintos visiveis na lista.</div>
+              <div className="mt-1 text-sm text-slate-300">Resolvidas e fora da fila principal.</div>
             </div>
 
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
@@ -579,13 +654,21 @@ export default function TasksPage() {
 
         <div className="mt-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            {(["open", "done", "all"] as DoneFilter[]).map((value) => (
+            {(["open", "todo", "in_progress", "done", "all"] as StatusFilter[]).map((value) => (
               <button
                 key={value}
-                onClick={() => setDoneFilter(value)}
-                className={`app-chip ${doneFilter === value ? "app-chip-active" : "app-chip-muted"}`}
+                onClick={() => setStatusFilter(value)}
+                className={`app-chip ${statusFilter === value ? "app-chip-active" : "app-chip-muted"}`}
               >
-                {value === "open" ? "Abertas" : value === "done" ? "Concluidas" : "Todas"}
+                {value === "open"
+                  ? "Abertas"
+                  : value === "todo"
+                    ? "A fazer"
+                    : value === "in_progress"
+                      ? "Em andamento"
+                      : value === "done"
+                        ? "Concluidas"
+                        : "Todas"}
               </button>
             ))}
           </div>
@@ -624,11 +707,11 @@ export default function TasksPage() {
         <div className="rounded-[22px] border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-700">{errorMsg}</div>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_380px]">
-        <div className="app-surface p-6">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,360px)]">
+        <div className="app-surface p-5 sm:p-6">
           <div>
             <div className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">Nova tarefa</div>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Capture e categorize rapidamente</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Capture, categorize e sinalize o momento atual</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Se a categoria ficar vazia, a tarefa entra em <strong>{UNCATEGORIZED_TASK_LABEL}</strong>.
             </p>
@@ -673,6 +756,12 @@ export default function TasksPage() {
             </div>
 
             <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">Status inicial</label>
+              <p className="mb-3 text-sm text-slate-500">Use &quot;Em andamento&quot; quando a tarefa ja tiver sido iniciada.</p>
+              <TaskStatusControl value={taskStatus} onChange={setTaskStatus} />
+            </div>
+
+            <div className="md:col-span-2">
               <label className="mb-2 block text-sm font-medium text-slate-700">Descricao ou notas</label>
               <textarea
                 className="app-textarea"
@@ -711,13 +800,16 @@ export default function TasksPage() {
             ) : null}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button onClick={createTask} className="app-btn app-btn-primary">
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button onClick={createTask} className="app-btn app-btn-primary w-full sm:w-auto">
               Criar tarefa
             </button>
 
             <div className="text-sm text-slate-500">
-              Visualizando: <span className="font-semibold text-slate-700">{buildCategoryFilterLabel(safeCategoryFilter)}</span>
+              Filtro ativo:{" "}
+              <span className="font-semibold text-slate-700">
+                {buildStatusFilterLabel(statusFilter)} em {buildCategoryFilterLabel(safeCategoryFilter)}
+              </span>
             </div>
           </div>
         </div>
@@ -742,7 +834,7 @@ export default function TasksPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-300">Lista inteligente</span>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Agrupada por categoria e ordenada por urgencia</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Agrupada por categoria, estado e urgencia</h2>
           </div>
 
           <div className="text-sm text-slate-300">
@@ -791,13 +883,13 @@ export default function TasksPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 p-5 xl:grid-cols-2">
+            <div className="grid gap-4 p-5 2xl:grid-cols-2">
               {group.tasks.map((task) =>
                 renderTaskCard({
                   task,
                   palette: group.palette,
                   router,
-                  onToggleDone: toggleDone,
+                  onStatusChange: updateTaskStatus,
                   onRemoveTask: removeTask,
                 })
               )}

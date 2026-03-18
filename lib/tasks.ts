@@ -1,6 +1,39 @@
-import type { Task, TaskPriority, TaskType } from "@/lib/types";
+import type { Task, TaskPriority, TaskStatus, TaskType } from "@/lib/types";
+
+export const TASK_STATUS_VALUES = ["todo", "in_progress", "done"] as const;
 
 export const UNCATEGORIZED_TASK_LABEL = "Sem categoria";
+
+export function isTaskStatus(value: unknown): value is TaskStatus {
+  return typeof value === "string" && TASK_STATUS_VALUES.includes(value as TaskStatus);
+}
+
+export function coerceTaskStatus(value: unknown, isDone = false): TaskStatus {
+  if (isTaskStatus(value)) return value;
+  return isDone ? "done" : "todo";
+}
+
+export function getTaskStatus(task: Pick<Task, "status" | "is_done">) {
+  return coerceTaskStatus(task.status, Boolean(task.is_done));
+}
+
+export function isTaskDone(task: Pick<Task, "status" | "is_done">) {
+  return getTaskStatus(task) === "done";
+}
+
+export function taskStatusLabel(value: TaskStatus | Pick<Task, "status" | "is_done">) {
+  const status = typeof value === "string" ? value : getTaskStatus(value);
+
+  if (status === "in_progress") return "Em andamento";
+  if (status === "done") return "Concluida";
+  return "A fazer";
+}
+
+export function taskStatusDescription(status: TaskStatus) {
+  if (status === "in_progress") return "Ja foi iniciada e precisa de continuidade.";
+  if (status === "done") return "Concluida e fora da fila principal.";
+  return "Ainda nao foi iniciada.";
+}
 
 export function formatTaskDateBR(isoDate: string) {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -34,7 +67,7 @@ export function taskCategoryLabel(category: string | null | undefined) {
 }
 
 export function isTaskOverdue(task: Task, now: Date = new Date()) {
-  if (task.is_done) return false;
+  if (isTaskDone(task)) return false;
 
   if (task.task_type === "due" && task.due_date) {
     const today = new Date(now);
@@ -79,6 +112,13 @@ function priorityWeight(priority: TaskPriority) {
   return 2;
 }
 
+function statusWeight(task: Task) {
+  const status = getTaskStatus(task);
+  if (status === "in_progress") return 0;
+  if (status === "todo") return 1;
+  return 2;
+}
+
 function taskReferenceTime(task: Task) {
   if (task.task_type === "scheduled" && task.scheduled_at) return new Date(task.scheduled_at).getTime();
   if (task.task_type === "due" && task.due_date) return new Date(`${task.due_date}T12:00:00`).getTime();
@@ -86,9 +126,20 @@ function taskReferenceTime(task: Task) {
 }
 
 export function compareTasksByUrgency(a: Task, b: Task) {
+  const aDone = isTaskDone(a);
+  const bDone = isTaskDone(b);
+  if (aDone !== bDone) return aDone ? 1 : -1;
+
+  if (aDone && bDone) {
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+  }
+
   const aOverdue = isTaskOverdue(a);
   const bOverdue = isTaskOverdue(b);
   if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
+
+  const statusDiff = statusWeight(a) - statusWeight(b);
+  if (statusDiff !== 0) return statusDiff;
 
   const priorityDiff = priorityWeight(a.priority) - priorityWeight(b.priority);
   if (priorityDiff !== 0) return priorityDiff;
@@ -110,4 +161,3 @@ export function taskWhenLabel(task: Task) {
 
   return "Sem data definida";
 }
-

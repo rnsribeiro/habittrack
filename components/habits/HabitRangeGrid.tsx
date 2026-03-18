@@ -54,12 +54,14 @@ export function HabitRangeGrid({
   start,
   end,
   onToggle,
+  compact = false,
 }: {
   habits: Habit[];
   completionMap: HabitCompletionMap;
   start: Date;
   end: Date;
   onToggle: (habitId: string, dateISO: string) => void;
+  compact?: boolean;
 }) {
   const todayISO = React.useMemo(() => toISODate(new Date()), []);
   const meta = React.useMemo(() => eachDayMeta(start, end, todayISO), [start, end, todayISO]);
@@ -71,16 +73,16 @@ export function HabitRangeGrid({
       style={
         {
           ["--days" as string]: totalDays,
-          ["--firstCol" as string]: "clamp(180px, 26vw, 300px)",
+          ["--firstCol" as string]: compact ? "clamp(128px, 38vw, 180px)" : "clamp(180px, 26vw, 300px)",
           ["--cell" as string]: "clamp(20px, calc((100% - var(--firstCol)) / var(--days)), 44px)",
-          ["--rowH" as string]: "44px",
+          ["--rowH" as string]: compact ? "42px" : "44px",
         } as React.CSSProperties
       }
     >
       <div className="sticky top-0 z-20 border-b bg-white">
         <div className="flex">
           <div className="sticky left-0 z-30 shrink-0 border-r bg-zinc-300 p-3 font-semibold" style={{ width: "var(--firstCol)" }}>
-            <span className="font-bold text-black">Habitos</span>
+            <span className={`font-bold text-black ${compact ? "text-sm" : ""}`}>Habitos</span>
           </div>
 
           {meta.map((item) => (
@@ -120,7 +122,7 @@ export function HabitRangeGrid({
         {habits.map((habit) => (
           <div key={habit.id} className="flex border-b last:border-b-0">
             <div className="sticky left-0 z-10 shrink-0 border-r bg-white p-3" style={{ width: "var(--firstCol)" }}>
-              <span className="block truncate text-sm font-semibold italic" style={{ color: habit.color }}>
+              <span className={`block truncate font-semibold italic ${compact ? "text-[13px]" : "text-sm"}`} style={{ color: habit.color }}>
                 {habit.title}
               </span>
             </div>

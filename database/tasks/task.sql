@@ -1,4 +1,4 @@
--- Tasks: due (data limite), scheduled (data específica), anytime (sem data)
+-- Tasks: due (data limite), scheduled (data especifica), anytime (sem data)
 
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
@@ -9,11 +9,13 @@ create table if not exists public.tasks (
   category text,
 
   task_type text not null check (task_type in ('due', 'scheduled', 'anytime')),
+  priority text not null default 'medium' check (priority in ('low', 'medium', 'high')),
+  status text not null default 'todo' check (status in ('todo', 'in_progress', 'done')),
 
-  -- "data limite" (só para due)
+  -- "data limite" (so para due)
   due_date date,
 
-  -- "data específica" (só para scheduled)
+  -- "data especifica" (so para scheduled)
   scheduled_at timestamptz,
 
   is_done boolean not null default false,
@@ -21,7 +23,7 @@ create table if not exists public.tasks (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  -- garante coerência do tipo com os campos de data
+  -- garante coerencia do tipo com os campos de data
   constraint tasks_type_dates_chk check (
     (task_type = 'due' and due_date is not null and scheduled_at is null)
     or (task_type = 'scheduled' and scheduled_at is not null and due_date is null)
@@ -32,11 +34,13 @@ create table if not exists public.tasks (
 create index if not exists tasks_user_id_idx on public.tasks(user_id);
 create index if not exists tasks_user_done_idx on public.tasks(user_id, is_done);
 create index if not exists tasks_user_type_idx on public.tasks(user_id, task_type);
+create index if not exists tasks_user_priority_idx on public.tasks(user_id, priority);
+create index if not exists tasks_user_status_idx on public.tasks(user_id, status);
 create index if not exists tasks_due_date_idx on public.tasks(user_id, due_date);
 create index if not exists tasks_scheduled_at_idx on public.tasks(user_id, scheduled_at);
 create index if not exists tasks_user_category_idx on public.tasks(user_id, category);
 
--- updated_at automático
+-- updated_at automatico
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin

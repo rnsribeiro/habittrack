@@ -187,6 +187,10 @@ select:focus {
   border-color: rgba(248, 113, 113, 0.4);
 }
 
+.ht-nav-scroll {
+  flex-wrap: wrap;
+}
+
 .app-page {
   display: flex;
   flex-direction: column;
@@ -341,6 +345,27 @@ select:focus {
 
   .ht-header-shell {
     border-radius: 22px;
+  }
+
+  .ht-nav-scroll {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .ht-nav-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ht-nav-scroll .ht-btn {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .ht-header-logout {
+    width: 100%;
   }
 
   .app-surface,

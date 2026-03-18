@@ -27,6 +27,8 @@ export type TaskPriority = "low" | "medium" | "high";
 
 export type TaskType = "due" | "scheduled" | "anytime";
 
+export type TaskStatus = "todo" | "in_progress" | "done";
+
 export type Task = {
   id: string;
   user_id: string;
@@ -42,6 +44,7 @@ export type Task = {
 
   priority: TaskPriority;        
 
+  status?: TaskStatus | null;
   is_done: boolean;
   created_at: string;
   updated_at: string;

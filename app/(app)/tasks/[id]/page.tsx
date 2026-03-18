@@ -2,19 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { TaskStatusControl } from "@/components/tasks/TaskStatusControl";
 import { getErrorMessage } from "@/lib/errors";
-import { useRequireSession } from "@/src/lib/useRequireSession";
-import { apiFetch } from "@/src/lib/api";
-import type { Task, TaskPriority, TaskType } from "@/lib/types";
 import {
   formatTaskDateBR,
   formatTaskDateTimeBR,
+  getTaskStatus,
   isTaskOverdue,
   priorityLabel,
   taskCategoryLabel,
+  taskStatusDescription,
+  taskStatusLabel,
   taskWhenLabel,
   typeLabel,
 } from "@/lib/tasks";
+import type { Task, TaskPriority, TaskStatus, TaskType } from "@/lib/types";
+import { apiFetch } from "@/src/lib/api";
+import { useRequireSession } from "@/src/lib/useRequireSession";
 
 function toDatetimeLocalValue(iso: string) {
   const date = new Date(iso);
@@ -24,10 +28,18 @@ function toDatetimeLocalValue(iso: string) {
   )}`;
 }
 
-function taskStatusLabel(task: Task) {
-  if (task.is_done) return "Concluida";
-  if (isTaskOverdue(task)) return "Vencida";
-  return "Em andamento";
+function statusBadgeClasses(value: TaskStatus | Task) {
+  const status = typeof value === "string" ? value : getTaskStatus(value);
+
+  if (status === "done") {
+    return "border-emerald-300/20 bg-emerald-400/10 text-emerald-100";
+  }
+
+  if (status === "in_progress") {
+    return "border-sky-300/20 bg-sky-400/10 text-sky-100";
+  }
+
+  return "border-amber-300/20 bg-amber-400/10 text-amber-100";
 }
 
 export default function TaskDetailsPage() {
@@ -48,7 +60,7 @@ export default function TaskDetailsPage() {
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
-  const [isDone, setIsDone] = useState(false);
+  const [status, setStatus] = useState<TaskStatus>("todo");
 
   useEffect(() => {
     if (!ready || !taskId) return;
@@ -68,7 +80,7 @@ export default function TaskDetailsPage() {
         setPriority(loadedTask.priority);
         setDueDate(loadedTask.due_date ?? "");
         setScheduledAt(loadedTask.scheduled_at ? toDatetimeLocalValue(loadedTask.scheduled_at) : "");
-        setIsDone(Boolean(loadedTask.is_done));
+        setStatus(getTaskStatus(loadedTask));
       } catch (error: unknown) {
         setErrorMsg(getErrorMessage(error, "Erro ao carregar tarefa."));
       } finally {
@@ -78,6 +90,7 @@ export default function TaskDetailsPage() {
   }, [ready, taskId]);
 
   const overdue = useMemo(() => (task ? isTaskOverdue(task) : false), [task]);
+  const currentStatus = status;
   const taskSummary = useMemo(() => (task ? taskWhenLabel(task) : ""), [task]);
 
   async function save() {
@@ -95,7 +108,7 @@ export default function TaskDetailsPage() {
       category: category.trim() ? category.trim() : null,
       task_type: taskType,
       priority,
-      is_done: isDone,
+      status,
     };
 
     if (taskType === "due") {
@@ -137,7 +150,7 @@ export default function TaskDetailsPage() {
       setPriority(updatedTask.priority);
       setDueDate(updatedTask.due_date ?? "");
       setScheduledAt(updatedTask.scheduled_at ? toDatetimeLocalValue(updatedTask.scheduled_at) : "");
-      setIsDone(Boolean(updatedTask.is_done));
+      setStatus(getTaskStatus(updatedTask));
     } catch (error: unknown) {
       setErrorMsg(getErrorMessage(error, "Erro ao salvar tarefa."));
     } finally {
@@ -195,9 +208,14 @@ export default function TaskDetailsPage() {
             </div>
 
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-semibold text-white">
-                {taskStatusLabel(task)}
+              <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${statusBadgeClasses(currentStatus)}`}>
+                {taskStatusLabel(currentStatus)}
               </span>
+              {overdue ? (
+                <span className="rounded-full border border-red-300/20 bg-red-400/10 px-3 py-1 text-sm font-semibold text-red-100">
+                  Vencida
+                </span>
+              ) : null}
               <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-semibold text-white">
                 {typeLabel(task.task_type)}
               </span>
@@ -211,11 +229,11 @@ export default function TaskDetailsPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-1">
-            <button onClick={save} disabled={saving} className="app-btn app-btn-primary">
+            <button onClick={save} disabled={saving} className="app-btn app-btn-primary w-full">
               {saving ? "Salvando..." : "Salvar alteracoes"}
             </button>
 
-            <button onClick={removeTask} disabled={saving} className="app-btn app-btn-danger">
+            <button onClick={removeTask} disabled={saving} className="app-btn app-btn-danger w-full">
               Excluir tarefa
             </button>
           </div>
@@ -227,13 +245,13 @@ export default function TaskDetailsPage() {
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="app-surface p-6">
-          <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50/90 px-4 py-3">
-            <input type="checkbox" checked={isDone} onChange={(event) => setIsDone(event.target.checked)} className="h-4 w-4" />
-            <div>
-              <div className="text-sm font-semibold text-slate-900">Marcar como concluida</div>
-              <div className="text-sm text-slate-500">Ao concluir, a tarefa deixa de ser tratada como urgente.</div>
-            </div>
+        <div className="app-surface p-5 sm:p-6">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-4">
+            <div className="text-sm font-semibold text-slate-900">Status da tarefa</div>
+            <p className="mt-1 text-sm text-slate-500">
+              Use &quot;Em andamento&quot; quando voce ja iniciou, mas ainda nao concluiu.
+            </p>
+            <TaskStatusControl value={status} onChange={setStatus} showDescription className="mt-4" />
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -317,7 +335,15 @@ export default function TaskDetailsPage() {
 
               <div>
                 <div className="text-sm text-slate-500">Status</div>
-                <div className={`mt-1 text-base font-semibold ${overdue ? "text-red-700" : "text-slate-900"}`}>{taskStatusLabel(task)}</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">{taskStatusLabel(currentStatus)}</div>
+                <div className="mt-1 text-sm text-slate-500">{taskStatusDescription(currentStatus)}</div>
+              </div>
+
+              <div>
+                <div className="text-sm text-slate-500">Urgencia</div>
+                <div className={`mt-1 text-base font-semibold ${overdue ? "text-red-700" : "text-slate-900"}`}>
+                  {overdue ? "Vencida" : "Dentro do prazo"}
+                </div>
               </div>
             </div>
           </section>
