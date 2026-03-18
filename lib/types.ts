@@ -3,14 +3,23 @@ export type Habit = {
   user_id: string;
   title: string;
   color: string; // "#22c55e"
+  frequency: "daily" | "weekdays" | "weekly" | "custom";
+  days_of_week: number[] | null;
+  start_date: string;
+  end_date: string | null;
+  archived_at: string | null;
   created_at: string;
+  updated_at: string;
 };
+
+export type HabitCompletionStatus = "done" | "partial" | "missed";
 
 export type HabitCompletion = {
   id: string;
   user_id: string;
   habit_id: string;
   date: string; // "YYYY-MM-DD"
+  status: HabitCompletionStatus;
   created_at: string;
 };
 
@@ -24,6 +33,7 @@ export type Task = {
 
   title: string;
   notes: string | null;
+  category: string | null;
 
   task_type: TaskType;
 

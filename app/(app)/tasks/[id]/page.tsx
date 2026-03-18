@@ -2,62 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getErrorMessage } from "@/lib/errors";
 import { useRequireSession } from "@/src/lib/useRequireSession";
 import { apiFetch } from "@/src/lib/api";
 import type { Task, TaskPriority, TaskType } from "@/lib/types";
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function formatDateBR(isoDate: string) {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(y, m - 1, d));
-}
-
-function formatDateTimeBR(iso: string) {
-  const dt = new Date(iso);
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(dt);
-}
+import {
+  formatTaskDateBR,
+  formatTaskDateTimeBR,
+  isTaskOverdue,
+  priorityLabel,
+  taskCategoryLabel,
+  taskWhenLabel,
+  typeLabel,
+} from "@/lib/tasks";
 
 function toDatetimeLocalValue(iso: string) {
-  // ISO -> "YYYY-MM-DDTHH:mm" no fuso local
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
-    d.getMinutes()
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+    date.getMinutes()
   )}`;
 }
 
-function typeLabel(t: TaskType) {
-  if (t === "due") return "limite";
-  if (t === "scheduled") return "agendada";
-  return "indefinida";
-}
-
-function priorityLabel(p: TaskPriority) {
-  if (p === "high") return "alta";
-  if (p === "low") return "baixa";
-  return "média";
-}
-
-function isOverdue(t: Task) {
-  if (t.is_done) return false;
-
-  if (t.task_type === "due" && t.due_date) {
-    const today = startOfDay(new Date());
-    const due = startOfDay(new Date(t.due_date + "T00:00:00"));
-    return due < today;
-  }
-
-  if (t.task_type === "scheduled" && t.scheduled_at) {
-    const when = new Date(t.scheduled_at);
-    return when < new Date();
-  }
-
-  return false;
+function taskStatusLabel(task: Task) {
+  if (task.is_done) return "Concluida";
+  if (isTaskOverdue(task)) return "Vencida";
+  return "Em andamento";
 }
 
 export default function TaskDetailsPage() {
@@ -71,80 +41,77 @@ export default function TaskDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // form
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [category, setCategory] = useState("");
   const [taskType, setTaskType] = useState<TaskType>("due");
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [dueDate, setDueDate] = useState(""); // YYYY-MM-DD
-  const [scheduledAt, setScheduledAt] = useState(""); // datetime-local
+  const [dueDate, setDueDate] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
   const [isDone, setIsDone] = useState(false);
 
-  async function load() {
-    const { task } = await apiFetch(`/api/tasks/${taskId}`);
-    setTask(task);
-
-    setTitle(task.title ?? "");
-    setNotes(task.notes ?? "");
-    setTaskType(task.task_type);
-    setPriority((task.priority ?? "medium") as TaskPriority);
-    setDueDate(task.due_date ?? "");
-    setScheduledAt(task.scheduled_at ? toDatetimeLocalValue(task.scheduled_at) : "");
-    setIsDone(!!task.is_done);
-  }
-
   useEffect(() => {
-    if (!ready) return;
-    if (!taskId) return;
+    if (!ready || !taskId) return;
 
     (async () => {
       setLoading(true);
       setErrorMsg(null);
       try {
-        await load();
-      } catch (e: any) {
-        setErrorMsg(e?.message ?? "Erro ao carregar tarefa.");
+        const response = await apiFetch(`/api/tasks/${taskId}`);
+        const loadedTask = response.task as Task;
+
+        setTask(loadedTask);
+        setTitle(loadedTask.title ?? "");
+        setNotes(loadedTask.notes ?? "");
+        setCategory(loadedTask.category ?? "");
+        setTaskType(loadedTask.task_type);
+        setPriority(loadedTask.priority);
+        setDueDate(loadedTask.due_date ?? "");
+        setScheduledAt(loadedTask.scheduled_at ? toDatetimeLocalValue(loadedTask.scheduled_at) : "");
+        setIsDone(Boolean(loadedTask.is_done));
+      } catch (error: unknown) {
+        setErrorMsg(getErrorMessage(error, "Erro ao carregar tarefa."));
       } finally {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, taskId]);
 
-  const overdue = useMemo(() => (task ? isOverdue(task) : false), [task]);
-
-  const infoLabel = useMemo(() => {
-    if (!task) return "";
-    if (task.task_type === "due" && task.due_date) return `Data limite: ${formatDateBR(task.due_date)}`;
-    if (task.task_type === "scheduled" && task.scheduled_at) return `Agendada: ${formatDateTimeBR(task.scheduled_at)}`;
-    return "Sem data";
-  }, [task]);
+  const overdue = useMemo(() => (task ? isTaskOverdue(task) : false), [task]);
+  const taskSummary = useMemo(() => (task ? taskWhenLabel(task) : ""), [task]);
 
   async function save() {
     if (!taskId) return;
-    setErrorMsg(null);
 
+    setErrorMsg(null);
     if (!title.trim()) {
-      setErrorMsg("Informe um título.");
+      setErrorMsg("Informe um titulo.");
       return;
     }
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       title: title.trim(),
       notes: notes.trim() ? notes.trim() : null,
+      category: category.trim() ? category.trim() : null,
       task_type: taskType,
       priority,
       is_done: isDone,
     };
 
     if (taskType === "due") {
-      if (!dueDate) return setErrorMsg("Informe a data limite.");
+      if (!dueDate) {
+        setErrorMsg("Informe a data limite.");
+        return;
+      }
       payload.due_date = dueDate;
       payload.scheduled_at = null;
     }
 
     if (taskType === "scheduled") {
-      if (!scheduledAt) return setErrorMsg("Informe a data específica.");
+      if (!scheduledAt) {
+        setErrorMsg("Informe a data especifica.");
+        return;
+      }
       payload.scheduled_at = new Date(scheduledAt).toISOString();
       payload.due_date = null;
     }
@@ -156,201 +123,237 @@ export default function TaskDetailsPage() {
 
     setSaving(true);
     try {
-      const { task } = await apiFetch(`/api/tasks/${taskId}`, {
+      const response = await apiFetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
 
-      setTask(task);
-
-      // repopula form
-      setTitle(task.title ?? "");
-      setNotes(task.notes ?? "");
-      setTaskType(task.task_type);
-      setPriority((task.priority ?? "medium") as TaskPriority);
-      setDueDate(task.due_date ?? "");
-      setScheduledAt(task.scheduled_at ? toDatetimeLocalValue(task.scheduled_at) : "");
-      setIsDone(!!task.is_done);
-    } catch (e: any) {
-      setErrorMsg(e?.message ?? "Erro ao salvar.");
+      const updatedTask = response.task as Task;
+      setTask(updatedTask);
+      setTitle(updatedTask.title ?? "");
+      setNotes(updatedTask.notes ?? "");
+      setCategory(updatedTask.category ?? "");
+      setTaskType(updatedTask.task_type);
+      setPriority(updatedTask.priority);
+      setDueDate(updatedTask.due_date ?? "");
+      setScheduledAt(updatedTask.scheduled_at ? toDatetimeLocalValue(updatedTask.scheduled_at) : "");
+      setIsDone(Boolean(updatedTask.is_done));
+    } catch (error: unknown) {
+      setErrorMsg(getErrorMessage(error, "Erro ao salvar tarefa."));
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove() {
+  async function removeTask() {
     if (!taskId) return;
-    setErrorMsg(null);
 
-    const ok = confirm("Tem certeza que deseja excluir esta tarefa?");
-    if (!ok) return;
+    if (!confirm("Tem certeza que deseja excluir esta tarefa?")) return;
 
+    setSaving(true);
     try {
       await apiFetch(`/api/tasks/${taskId}`, { method: "DELETE" });
       router.replace("/tasks");
-    } catch (e: any) {
-      setErrorMsg(e?.message ?? "Erro ao excluir.");
+    } catch (error: unknown) {
+      setErrorMsg(getErrorMessage(error, "Erro ao excluir tarefa."));
+    } finally {
+      setSaving(false);
     }
   }
 
-  if (!ready) return <div className="p-6 text-sm text-zinc-600">Carregando...</div>;
-
-  if (loading) return <div className="p-6 text-sm text-zinc-600">Carregando tarefa...</div>;
+  if (!ready) return <div className="p-6 text-sm text-slate-300">Carregando...</div>;
+  if (loading) return <div className="p-6 text-sm text-slate-300">Carregando tarefa...</div>;
 
   if (!task) {
     return (
-      <div className="p-6 space-y-3">
-        <div className="text-sm text-zinc-700">Tarefa não encontrada.</div>
-        <button className="px-4 py-2 rounded-xl border hover:bg-zinc-50" onClick={() => router.push("/tasks")}>
-          Voltar
-        </button>
+      <div className="app-page">
+        <div className="app-surface p-6">
+          <p className="text-sm text-slate-600">Tarefa nao encontrada.</p>
+          <button className="app-btn app-btn-secondary mt-4" onClick={() => router.push("/tasks")}>
+            Voltar para tarefas
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-4">
-      {/* Top bar */}
-      <div className="flex items-start justify-between gap-3 flex-col sm:flex-row">
-        <div>
-          <button
-            className="text-sm px-3 py-2 rounded-xl border hover:bg-zinc-50"
-            onClick={() => router.push("/tasks")}
-          >
-            ← Voltar
-          </button>
+    <div className="app-page pb-4">
+      <section className="app-surface-dark overflow-hidden p-6 sm:p-7">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <button className="app-btn app-btn-secondary" onClick={() => router.push("/tasks")}>
+              &larr; Voltar
+            </button>
 
-          <h1 className="text-xl font-semibold mt-3">Detalhes da tarefa</h1>
+            <div className="mt-5">
+              <span className="app-kicker">Detalhes da tarefa</span>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{task.title}</h1>
+              <p className="app-subtle-dark mt-3 max-w-2xl text-sm leading-6 sm:text-base">
+                {task.notes?.trim() || "Use esta tela para editar dados, categoria, prazo e acompanhar o estado da tarefa."}
+              </p>
+            </div>
 
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="text-xs px-2 py-0.5 rounded-full border border-zinc-200 bg-white text-zinc-700">
-              {typeLabel(task.task_type)}
-            </span>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-zinc-200 bg-zinc-50 text-zinc-800">
-              prioridade {priorityLabel(task.priority)}
-            </span>
-
-            {overdue ? (
-              <span className="text-xs px-2 py-0.5 rounded-full border border-red-200 bg-red-50 text-red-700">
-                vencida
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-semibold text-white">
+                {taskStatusLabel(task)}
               </span>
-            ) : null}
+              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-semibold text-white">
+                {typeLabel(task.task_type)}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-sm font-semibold text-white">
+                Prioridade {priorityLabel(task.priority).toLowerCase()}
+              </span>
+              <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-100">
+                {taskCategoryLabel(task.category)}
+              </span>
+            </div>
+          </div>
 
-            <span className={`text-sm ${overdue ? "text-red-700" : "text-zinc-600"}`}>{infoLabel}</span>
+          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[20rem] xl:grid-cols-1">
+            <button onClick={save} disabled={saving} className="app-btn app-btn-primary">
+              {saving ? "Salvando..." : "Salvar alteracoes"}
+            </button>
+
+            <button onClick={removeTask} disabled={saving} className="app-btn app-btn-danger">
+              Excluir tarefa
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="text-sm px-4 py-2 rounded-xl bg-black text-white hover:opacity-95 disabled:opacity-60"
-            onClick={save}
-            disabled={saving}
-          >
-            {saving ? "Salvando..." : "Salvar"}
-          </button>
-
-          <button className="text-sm px-4 py-2 rounded-xl border hover:bg-zinc-50" onClick={remove}>
-            Excluir
-          </button>
-        </div>
-      </div>
+      </section>
 
       {errorMsg ? (
-        <div className="rounded-xl border bg-zinc-50 px-3 py-2 text-sm">{errorMsg}</div>
+        <div className="rounded-[22px] border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-700">{errorMsg}</div>
       ) : null}
 
-      {/* Card */}
-      <div className="bg-white border rounded-2xl p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="h-4 w-4"
-            checked={isDone}
-            onChange={(e) => setIsDone(e.target.checked)}
-          />
-          <span className="text-sm text-zinc-700">Concluída</span>
-        </div>
-
-        <div>
-          <label className="text-sm text-zinc-700">Título</label>
-          <input
-            className="w-full mt-1 border rounded-xl px-3 py-2"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Título da tarefa"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm text-zinc-700">Descrição/Notas</label>
-          <textarea
-            className="w-full mt-1 border rounded-xl px-3 py-2 min-h-27.5"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Detalhes…"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm text-zinc-700">Prioridade</label>
-            <select
-              className="w-full mt-1 border rounded-xl px-3 py-2 bg-white"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            >
-              <option value="low">baixa</option>
-              <option value="medium">média</option>
-              <option value="high">alta</option>
-            </select>
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="app-surface p-6">
+          <div className="flex items-center gap-3 rounded-[20px] border border-slate-200 bg-slate-50/90 px-4 py-3">
+            <input type="checkbox" checked={isDone} onChange={(event) => setIsDone(event.target.checked)} className="h-4 w-4" />
+            <div>
+              <div className="text-sm font-semibold text-slate-900">Marcar como concluida</div>
+              <div className="text-sm text-slate-500">Ao concluir, a tarefa deixa de ser tratada como urgente.</div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm text-zinc-700">Tipo</label>
-            <select
-              className="w-full mt-1 border rounded-xl px-3 py-2 bg-white"
-              value={taskType}
-              onChange={(e) => setTaskType(e.target.value as TaskType)}
-            >
-              <option value="due">data limite</option>
-              <option value="scheduled">data específica</option>
-              <option value="anytime">indefinida</option>
-            </select>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">Titulo</label>
+              <input className="app-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Titulo da tarefa" />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Categoria</label>
+              <input
+                className="app-input"
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Ex: Trabalho, Casa, Estudos"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Prioridade</label>
+              <select className="app-select" value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
+                <option value="low">Baixa</option>
+                <option value="medium">Media</option>
+                <option value="high">Alta</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">Notas</label>
+              <textarea
+                className="app-textarea"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Descreva contexto, detalhes ou proximos passos."
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Tipo</label>
+              <select className="app-select" value={taskType} onChange={(event) => setTaskType(event.target.value as TaskType)}>
+                <option value="due">Com prazo</option>
+                <option value="scheduled">Agendada</option>
+                <option value="anytime">Flexivel</option>
+              </select>
+            </div>
+
+            {taskType === "due" ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Data limite</label>
+                <input type="date" className="app-input" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              </div>
+            ) : null}
+
+            {taskType === "scheduled" ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Data e hora</label>
+                <input
+                  type="datetime-local"
+                  className="app-input"
+                  value={scheduledAt}
+                  onChange={(event) => setScheduledAt(event.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
-        {taskType === "due" ? (
-          <div>
-            <label className="text-sm text-zinc-700">Data limite</label>
-            <input
-              className="w-full mt-1 border rounded-xl px-3 py-2"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-        ) : null}
+        <aside className="space-y-4">
+          <section className="app-surface p-5">
+            <div className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">Resumo</div>
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="text-sm text-slate-500">Categoria atual</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900">{taskCategoryLabel(task.category)}</div>
+              </div>
 
-        {taskType === "scheduled" ? (
-          <div>
-            <label className="text-sm text-zinc-700">Data específica</label>
-            <input
-              className="w-full mt-1 border rounded-xl px-3 py-2"
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-            />
-          </div>
-        ) : null}
+              <div>
+                <div className="text-sm text-slate-500">Agendamento</div>
+                <div className={`mt-1 text-base font-semibold ${overdue ? "text-red-700" : "text-slate-900"}`}>{taskSummary}</div>
+              </div>
 
-        <div className="text-xs text-zinc-500">
-          Criada em:{" "}
-          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.created_at))}
-          {" • "}
-          Atualizada em:{" "}
-          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.updated_at))}
-        </div>
-      </div>
+              <div>
+                <div className="text-sm text-slate-500">Status</div>
+                <div className={`mt-1 text-base font-semibold ${overdue ? "text-red-700" : "text-slate-900"}`}>{taskStatusLabel(task)}</div>
+              </div>
+            </div>
+          </section>
+
+          <section className="app-surface p-5">
+            <div className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">Historico</div>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <div>
+                Criada em{" "}
+                <span className="font-semibold text-slate-900">
+                  {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.created_at))}
+                </span>
+              </div>
+
+              <div>
+                Atualizada em{" "}
+                <span className="font-semibold text-slate-900">
+                  {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.updated_at))}
+                </span>
+              </div>
+
+              {task.task_type === "due" && task.due_date ? (
+                <div>
+                  Prazo formatado: <span className="font-semibold text-slate-900">{formatTaskDateBR(task.due_date)}</span>
+                </div>
+              ) : null}
+
+              {task.task_type === "scheduled" && task.scheduled_at ? (
+                <div>
+                  Data agendada: <span className="font-semibold text-slate-900">{formatTaskDateTimeBR(task.scheduled_at)}</span>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </aside>
+      </section>
     </div>
   );
 }

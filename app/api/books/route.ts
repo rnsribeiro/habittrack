@@ -24,14 +24,48 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status"); // reading|finished|abandoned|null
+  const finishedYear = url.searchParams.get("finishedYear");
 
   let q = supa.from("books").select("*").eq("user_id", userRes.user.id);
   if (status) q = q.eq("status", status);
 
-  const { data, error } = await q.order("updated_at", { ascending: false });
+  if (finishedYear) {
+    const year = Number(finishedYear);
+    if (!Number.isInteger(year) || year < 1900 || year > 9999) {
+      return NextResponse.json({ error: "finishedYear invalido" }, { status: 400 });
+    }
+
+    q = q
+      .gte("finished_at", `${year}-01-01T00:00:00.000Z`)
+      .lt("finished_at", `${year + 1}-01-01T00:00:00.000Z`);
+  }
+
+  const [booksRes, yearsRes] = await Promise.all([
+    q.order("updated_at", { ascending: false }),
+    supa
+      .from("books")
+      .select("finished_at")
+      .eq("user_id", userRes.user.id)
+      .eq("status", "finished")
+      .not("finished_at", "is", null),
+  ]);
+
+  const { data, error } = booksRes;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ books: data ?? [] });
+  if (yearsRes.error) return NextResponse.json({ error: yearsRes.error.message }, { status: 500 });
+
+  const availableFinishedYears = Array.from(
+    new Set(
+      (yearsRes.data ?? [])
+        .map((row) => row.finished_at)
+        .filter(Boolean)
+        .map((value) => new Date(value as string).getFullYear())
+        .filter((year) => Number.isFinite(year))
+    )
+  ).sort((a, b) => b - a);
+
+  return NextResponse.json({ books: data ?? [], available_finished_years: availableFinishedYears });
 }
 
 export async function POST(req: NextRequest) {
@@ -68,7 +102,16 @@ export async function POST(req: NextRequest) {
   if (!title) return NextResponse.json({ error: "Título obrigatório" }, { status: 400 });
   if (!author) return NextResponse.json({ error: "Autor obrigatório" }, { status: 400 });
 
-  const payload: any = {
+  const payload: {
+    user_id: string;
+    title: string;
+    author: string;
+    cover_url: string | null;
+    total_pages: number;
+    current_page: number;
+    status: "reading";
+    started_at: string | null;
+  } = {
     user_id: userRes.user.id,
     title,
     author,

@@ -28,46 +28,31 @@ export function PeriodControls({
   onToday: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 flex-col sm:flex-row">
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={onPrev}
-          className="text-sm px-3 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200"
-        >
-          ←
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={onPrev} className="app-btn app-btn-secondary" aria-label="Período anterior">
+          &larr;
         </button>
 
-        <button
-          onClick={onNext}
-          className="text-sm px-3 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200"
-        >
-          →
+        <button onClick={onNext} className="app-btn app-btn-secondary" aria-label="Próximo período">
+          &rarr;
         </button>
 
-        <button
-          onClick={onToday}
-          className="text-sm px-3 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100 active:bg-zinc-200"
-        >
+        <button onClick={onToday} className="app-btn app-btn-secondary">
           Hoje
         </button>
 
-        <select
-          value={period}
-          onChange={(e) => onPeriodChange(e.target.value as Period)}
-          className="text-sm px-3 py-2 rounded-xl border border-zinc-300 bg-white text-zinc-900"
-        >
-          {PERIODS.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
+        <select value={period} onChange={(e) => onPeriodChange(e.target.value as Period)} className="app-select min-w-[10rem]">
+          {PERIODS.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="text-2xl text-zinc-50">
-        <span className="font-semibold capitalize">
-          {formatRangeLabel(period, anchor)}
-        </span>
+      <div className="text-xl font-semibold text-white sm:text-2xl">
+        <span className="capitalize">{formatRangeLabel(period, anchor)}</span>
       </div>
     </div>
   );

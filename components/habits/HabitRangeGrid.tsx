@@ -1,62 +1,51 @@
 "use client";
 
 import React from "react";
+import { canMarkHabitDate, type HabitCompletionMap } from "@/lib/habits";
 import type { Habit } from "@/lib/types";
 import { toISODate } from "@/src/lib/period";
+import { HabitCompletionCell } from "@/components/habits/HabitCompletionCell";
 
-// 0=Dom..6=Sab
-const WEEKDAY_INITIAL_PT: string[] = ["D", "S", "T", "Q", "Q", "S", "S"];
-const WEEKDAY_FULL_PT: string[] = [
-  "Domingo",
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-];
-
-type CompletionMap = Record<string, true>;
+const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEKDAY_FULL_PT = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
 
 function isWeekend(dow: number) {
   return dow === 0 || dow === 6;
 }
 
 function eachDayMeta(start: Date, end: Date, todayISO: string) {
-  const res: {
+  const result: {
     iso: string;
     day: number;
-    dow: number;
     initial: string;
     full: string;
     weekend: boolean;
     isToday: boolean;
   }[] = [];
 
-  const d = new Date(start);
-  d.setHours(0, 0, 0, 0);
+  const date = new Date(start);
+  date.setHours(0, 0, 0, 0);
 
-  const e = new Date(end);
-  e.setHours(0, 0, 0, 0);
+  const rangeEnd = new Date(end);
+  rangeEnd.setHours(0, 0, 0, 0);
 
-  while (d <= e) {
-    const dow = d.getDay();
-    const iso = toISODate(d);
+  while (date <= rangeEnd) {
+    const dow = date.getDay();
+    const iso = toISODate(date);
 
-    res.push({
+    result.push({
       iso,
-      day: d.getDate(),
-      dow,
+      day: date.getDate(),
       initial: WEEKDAY_INITIAL_PT[dow] ?? "",
       full: WEEKDAY_FULL_PT[dow] ?? "",
       weekend: isWeekend(dow),
       isToday: iso === todayISO,
     });
 
-    d.setDate(d.getDate() + 1);
+    date.setDate(date.getDate() + 1);
   }
 
-  return res;
+  return result;
 }
 
 export function HabitRangeGrid({
@@ -67,74 +56,59 @@ export function HabitRangeGrid({
   onToggle,
 }: {
   habits: Habit[];
-  completionMap: CompletionMap;
+  completionMap: HabitCompletionMap;
   start: Date;
   end: Date;
   onToggle: (habitId: string, dateISO: string) => void;
 }) {
   const todayISO = React.useMemo(() => toISODate(new Date()), []);
-
-  const meta = React.useMemo(
-    () => eachDayMeta(start, end, todayISO),
-    [start, end, todayISO]
-  );
-
+  const meta = React.useMemo(() => eachDayMeta(start, end, todayISO), [start, end, todayISO]);
   const totalDays = meta.length;
 
   return (
     <div
-      className="w-full border rounded-lg bg-white"
+      className="w-full rounded-lg border bg-white"
       style={
         {
-          ["--days" as any]: totalDays,
-          ["--firstCol" as any]: "clamp(180px, 26vw, 300px)",
-          ["--cell" as any]:
-            "clamp(20px, calc((100% - var(--firstCol)) / var(--days)), 44px)",
-          ["--rowH" as any]: "44px",
+          ["--days" as string]: totalDays,
+          ["--firstCol" as string]: "clamp(180px, 26vw, 300px)",
+          ["--cell" as string]: "clamp(20px, calc((100% - var(--firstCol)) / var(--days)), 44px)",
+          ["--rowH" as string]: "44px",
         } as React.CSSProperties
       }
     >
-      {/* HEADER */}
-      <div className="sticky top-0 z-20 bg-white border-b">
+      <div className="sticky top-0 z-20 border-b bg-white">
         <div className="flex">
-          <div
-            className="shrink-0 font-semibold p-3 border-r sticky left-0 bg-zinc-300 z-30"
-            style={{ width: "var(--firstCol)" }}
-          >
-            <span className="font-bold text-black">Hábitos</span>
+          <div className="sticky left-0 z-30 shrink-0 border-r bg-zinc-300 p-3 font-semibold" style={{ width: "var(--firstCol)" }}>
+            <span className="font-bold text-black">Habitos</span>
           </div>
 
-          {meta.map((m) => (
+          {meta.map((item) => (
             <div
-              key={m.iso}
+              key={item.iso}
               className={[
                 "shrink-0 border-r",
-                m.isToday
-                  ? "bg-emerald-100"
-                  : m.weekend
-                  ? "bg-zinc-50"
-                  : "bg-white",
+                item.isToday ? "bg-emerald-100" : item.weekend ? "bg-amber-100" : "bg-white",
               ].join(" ")}
               style={{ width: "var(--cell)" }}
-              title={`${m.full} (${m.iso})`}
+              title={`${item.full} (${item.iso})`}
             >
-              <div className="py-2 leading-none flex flex-col items-center justify-center">
+              <div className="flex flex-col items-center justify-center py-2 leading-none">
                 <div
                   className={[
                     "text-[11px] font-semibold",
-                    m.isToday ? "text-emerald-700" : "text-zinc-800",
+                    item.isToday ? "text-emerald-700" : item.weekend ? "text-amber-700" : "text-zinc-800",
                   ].join(" ")}
                 >
-                  {m.day}
+                  {item.day}
                 </div>
-
                 <div
                   className={[
-                    "text-[10px] mt-1",
-                    m.isToday ? "text-emerald-700 font-bold" : "text-zinc-500",
+                    "mt-1 text-[10px]",
+                    item.isToday ? "font-bold text-emerald-700" : item.weekend ? "font-medium text-amber-600" : "text-zinc-500",
                   ].join(" ")}
                 >
-                  {m.initial}
+                  {item.initial}
                 </div>
               </div>
             </div>
@@ -142,55 +116,33 @@ export function HabitRangeGrid({
         </div>
       </div>
 
-      {/* BODY */}
       <div>
-        {habits.map((h) => (
-          <div key={h.id} className="flex border-b last:border-b-0">
-            {/* Coluna do hábito */}
-            <div
-              className="shrink-0 p-3 border-r sticky left-0 bg-white z-10"
-              style={{ width: "var(--firstCol)" }}
-            >
-              <span
-                className="text-sm font-semibold italic truncate block"
-                style={{ color: h.color }}
-              >
-                {h.title}
+        {habits.map((habit) => (
+          <div key={habit.id} className="flex border-b last:border-b-0">
+            <div className="sticky left-0 z-10 shrink-0 border-r bg-white p-3" style={{ width: "var(--firstCol)" }}>
+              <span className="block truncate text-sm font-semibold italic" style={{ color: habit.color }}>
+                {habit.title}
               </span>
             </div>
 
-            {/* Dias */}
-            {meta.map((m) => {
-              const key = `${h.id}:${m.iso}`;
-              const done = !!completionMap[key];
+            {meta.map((item) => {
+              const key = `${habit.id}:${item.iso}`;
+              const status = completionMap[key] ?? null;
 
               return (
-                <button
-                  key={m.iso}
-                  type="button"
+                <HabitCompletionCell
+                  key={item.iso}
+                  status={status}
+                  color={habit.color}
+                  canMark={canMarkHabitDate(item.iso, todayISO)}
                   className={[
-                    "shrink-0 border-r flex items-center justify-center hover:bg-emerald-100 hover:rounded-md",
-                    m.isToday
-                      ? "bg-emerald-100"
-                      : m.weekend
-                      ? "bg-zinc-50"
-                      : "bg-white",
+                    "relative shrink-0 border-r flex items-center justify-center",
+                    item.isToday ? "bg-emerald-100" : item.weekend ? "bg-amber-100" : "bg-white",
                   ].join(" ")}
                   style={{ width: "var(--cell)", height: "var(--rowH)" }}
-                  onClick={() => onToggle(h.id, m.iso)}
-                >
-                  <span
-                    className={[
-                      "rounded-[5px] border",
-                      done ? "border-transparent" : "border-zinc-400",
-                    ].join(" ")}
-                    style={{
-                      width: "clamp(10px, calc(var(--cell) * 0.6), 16px)",
-                      height: "clamp(10px, calc(var(--cell) * 0.6), 16px)",
-                      backgroundColor: done ? h.color : "transparent",
-                    }}
-                  />
-                </button>
+                  onClick={() => onToggle(habit.id, item.iso)}
+                  label={`${habit.title} - ${item.iso}`}
+                />
               );
             })}
           </div>

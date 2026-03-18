@@ -27,29 +27,42 @@ export async function POST(req: Request) {
   const { data: userRes } = await supa.auth.getUser();
   if (!userRes?.user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  const { habit_id, date } = body as { habit_id: string; date: string };
+  const { habit_id, date, status } = body as { habit_id: string; date: string; status?: "done" | "partial" | "missed" | null };
+
+  if (status !== undefined && status !== null && !["done", "partial", "missed"].includes(status)) {
+    return NextResponse.json({ error: "invalid status" }, { status: 400 });
+  }
 
   const { data: existing, error: exErr } = await supa
     .from("habit_completions")
-    .select("id")
+    .select("id,status")
     .eq("habit_id", habit_id)
     .eq("date", date)
     .maybeSingle();
 
   if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
 
-  if (existing?.id) {
+  if (status === null) {
+    if (!existing?.id) return NextResponse.json({ status: null });
+
     const { error } = await supa.from("habit_completions").delete().eq("id", existing.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ done: false });
+    return NextResponse.json({ status: null });
+  }
+
+  if (existing?.id) {
+    const { error } = await supa.from("habit_completions").update({ status: status ?? "done" }).eq("id", existing.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ status: status ?? "done" });
   }
 
   const { error } = await supa.from("habit_completions").insert({
     user_id: userRes.user.id,
     habit_id,
     date,
+    status: status ?? "done",
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ done: true });
+  return NextResponse.json({ status: status ?? "done" });
 }

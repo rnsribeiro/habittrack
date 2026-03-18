@@ -6,6 +6,7 @@ create table if not exists public.tasks (
 
   title text not null,
   notes text,
+  category text,
 
   task_type text not null check (task_type in ('due', 'scheduled', 'anytime')),
 
@@ -33,6 +34,7 @@ create index if not exists tasks_user_done_idx on public.tasks(user_id, is_done)
 create index if not exists tasks_user_type_idx on public.tasks(user_id, task_type);
 create index if not exists tasks_due_date_idx on public.tasks(user_id, due_date);
 create index if not exists tasks_scheduled_at_idx on public.tasks(user_id, scheduled_at);
+create index if not exists tasks_user_category_idx on public.tasks(user_id, category);
 
 -- updated_at automático
 create or replace function public.set_updated_at()

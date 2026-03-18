@@ -14,6 +14,15 @@ function supaFromToken(token: string) {
   );
 }
 
+function parseCategory(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 60) : null;
+}
+
 export async function GET(req: NextRequest) {
   const token = getToken(req);
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 401 });
@@ -25,12 +34,16 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const type = url.searchParams.get("type"); // due|scheduled|anytime|null
   const done = url.searchParams.get("done"); // true|false|null
+  const category = parseCategory(url.searchParams.get("category"));
+  const uncategorized = url.searchParams.get("uncategorized") === "true";
 
   let q = supa.from("tasks").select("*").eq("user_id", userRes.user.id);
 
   if (type) q = q.eq("task_type", type);
   if (done === "true") q = q.eq("is_done", true);
   if (done === "false") q = q.eq("is_done", false);
+  if (category) q = q.eq("category", category);
+  if (uncategorized) q = q.is("category", null);
 
   const { data, error } = await q
     .order("is_done", { ascending: true })
@@ -64,10 +77,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
   }
 
-  const payload: any = {
+  const payload: {
+    user_id: string;
+    title: string;
+    notes: string | null;
+    category: string | null;
+    task_type: "due" | "scheduled" | "anytime";
+    priority: "low" | "medium" | "high";
+    due_date: string | null;
+    scheduled_at: string | null;
+  } = {
     user_id: userRes.user.id,
     title: body.title,
     notes: body.notes ?? null,
+    category: parseCategory(body.category) ?? null,
     task_type,
     priority,
     due_date: null,

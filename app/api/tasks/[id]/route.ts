@@ -14,10 +14,18 @@ function supaFromToken(token: string) {
   );
 }
 
+function parseCategory(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 60) : null;
+}
+
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 async function getId(ctx: Ctx) {
-  const p: any = (ctx as any).params;
-  const resolved = typeof p?.then === "function" ? await p : p;
+  const resolved = await Promise.resolve(ctx.params);
   return resolved.id as string;
 }
 
@@ -56,10 +64,15 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { data: userRes } = await supa.auth.getUser();
   if (!userRes?.user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
-  const payload: any = {};
+  const payload: Record<string, unknown> = {};
   if (typeof body.title === "string") payload.title = body.title;
   if (typeof body.notes === "string" || body.notes === null) payload.notes = body.notes;
   if (typeof body.is_done === "boolean") payload.is_done = body.is_done;
+
+  if (body.category === null || typeof body.category === "string") {
+    const category = parseCategory(body.category);
+    payload.category = category ?? null;
+  }
 
   if (typeof body.priority === "string") {
     if (!["low", "medium", "high"].includes(body.priority)) {

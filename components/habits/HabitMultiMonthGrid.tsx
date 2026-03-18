@@ -1,23 +1,13 @@
 "use client";
 
-import React from "react";
-import { useMemo } from "react";
-
+import React, { useMemo } from "react";
+import { canMarkHabitDate, type HabitCompletionMap } from "@/lib/habits";
 import type { Habit } from "@/lib/types";
 import { toISODate, startOfMonth, endOfMonth } from "@/src/lib/period";
+import { HabitCompletionCell } from "@/components/habits/HabitCompletionCell";
 
-type CompletionMap = Record<string, true>;
-
-const WEEKDAY_INITIAL_PT: string[] = ["D", "S", "T", "Q", "Q", "S", "S"];
-const WEEKDAY_FULL_PT: string[] = [
-  "Domingo",
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-];
+const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEKDAY_FULL_PT = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
 
 function isWeekend(dow: number) {
   return dow === 0 || dow === 6;
@@ -27,54 +17,58 @@ function monthLabel(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
 }
 
-function buildMonthMeta(anchorMonth: Date) {
+function buildMonthMeta(anchorMonth: Date, todayISO: string) {
   const start = startOfMonth(anchorMonth);
   const end = endOfMonth(anchorMonth);
 
   const days: {
     iso: string;
     day: number;
-    dow: number;
     initial: string;
     full: string;
     weekend: boolean;
+    isToday: boolean;
   }[] = [];
 
-  const d = new Date(start);
-  d.setHours(0, 0, 0, 0);
+  const date = new Date(start);
+  date.setHours(0, 0, 0, 0);
 
-  const e = new Date(end);
-  e.setHours(0, 0, 0, 0);
+  const monthEnd = new Date(end);
+  monthEnd.setHours(0, 0, 0, 0);
 
-  while (d <= e) {
-    const dow = d.getDay();
+  while (date <= monthEnd) {
+    const dow = date.getDay();
+    const iso = toISODate(date);
+
     days.push({
-      iso: toISODate(d),
-      day: d.getDate(),
-      dow,
+      iso,
+      day: date.getDate(),
       initial: WEEKDAY_INITIAL_PT[dow] ?? "",
       full: WEEKDAY_FULL_PT[dow] ?? "",
       weekend: isWeekend(dow),
+      isToday: iso === todayISO,
     });
-    d.setDate(d.getDate() + 1);
+
+    date.setDate(date.getDate() + 1);
   }
 
   return { start, end, label: monthLabel(start), days };
 }
 
 function monthsInRange(start: Date, end: Date) {
-  const res: Date[] = [];
-  const d = new Date(start.getFullYear(), start.getMonth(), 1);
-  d.setHours(0, 0, 0, 0);
+  const result: Date[] = [];
+  const date = new Date(start.getFullYear(), start.getMonth(), 1);
+  date.setHours(0, 0, 0, 0);
 
   const last = new Date(end.getFullYear(), end.getMonth(), 1);
   last.setHours(0, 0, 0, 0);
 
-  while (d <= last) {
-    res.push(new Date(d));
-    d.setMonth(d.getMonth() + 1);
+  while (date <= last) {
+    result.push(new Date(date));
+    date.setMonth(date.getMonth() + 1);
   }
-  return res;
+
+  return result;
 }
 
 function MonthCard({
@@ -83,93 +77,83 @@ function MonthCard({
   habit,
   completionMap,
   onToggle,
+  todayISO,
 }: {
   label: string;
   days: {
     iso: string;
     day: number;
-    dow: number;
     initial: string;
     full: string;
     weekend: boolean;
+    isToday: boolean;
   }[];
   habit: Habit;
-  completionMap: CompletionMap;
+  completionMap: HabitCompletionMap;
   onToggle: (habitId: string, dateISO: string) => void;
+  todayISO: string;
 }) {
   const totalDays = days.length;
 
   return (
-    <div className="bg-white border rounded-2xl overflow-hidden">
-      {/* header do mês */}
-      <div className="px-4 py-3 border-b bg-white">
+    <div className="overflow-hidden rounded-2xl border bg-white">
+      <div className="border-b bg-white px-4 py-3">
         <div className="text-sm font-semibold capitalize text-zinc-900">{label}</div>
-        <div className="text-xs text-zinc-600 mt-0.5">Clique para marcar/desmarcar.</div>
+        <div className="mt-0.5 text-xs text-zinc-600">Clique para alternar entre concluido, parcial e nao realizado.</div>
       </div>
 
-      {/* grade */}
       <div
         className="w-full"
         style={
           {
-            ["--days" as any]: totalDays,
-            ["--cell" as any]: `clamp(20px, calc(100% / var(--days)), 44px)`,
-            ["--rowH" as any]: "42px",
+            ["--days" as string]: totalDays,
+            ["--cell" as string]: "clamp(20px, calc(100% / var(--days)), 44px)",
+            ["--rowH" as string]: "42px",
           } as React.CSSProperties
         }
       >
-        {/* header dias */}
         <div className="flex border-b">
-          {days.map((d) => (
+          {days.map((day) => (
             <div
-              key={d.iso}
+              key={day.iso}
               className={[
                 "shrink-0 border-r last:border-r-0",
-                d.weekend ? "bg-zinc-50" : "bg-white",
+                day.isToday ? "bg-emerald-100" : day.weekend ? "bg-amber-100" : "bg-white",
               ].join(" ")}
               style={{ width: "var(--cell)" }}
-              title={`${d.full} (${d.iso})`}
+              title={`${day.full} (${day.iso})`}
             >
-              <div className="py-2 leading-none flex flex-col items-center justify-center">
-                <div className="text-[11px] font-semibold text-zinc-900">{d.day}</div>
-                <div className="text-[10px] text-zinc-600 mt-1">{d.initial}</div>
+              <div className="flex flex-col items-center justify-center py-2 leading-none">
+                <div className={["text-[11px] font-semibold", day.isToday ? "text-emerald-700" : day.weekend ? "text-amber-700" : "text-zinc-900"].join(" ")}>
+                  {day.day}
+                </div>
+                <div className={["mt-1 text-[10px]", day.isToday ? "font-bold text-emerald-700" : day.weekend ? "font-medium text-amber-600" : "text-zinc-600"].join(" ")}>
+                  {day.initial}
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* linha de marcação */}
         <div className="flex">
-          {days.map((d) => {
-            const key = `${habit.id}:${d.iso}`;
-            const done = !!completionMap[key];
+          {days.map((day) => {
+            const key = `${habit.id}:${day.iso}`;
+            const status = completionMap[key] ?? null;
 
             return (
-              <button
-                key={d.iso}
-                type="button"
+              <HabitCompletionCell
+                key={day.iso}
+                status={status}
+                color={habit.color}
+                canMark={canMarkHabitDate(day.iso, todayISO)}
                 className={[
-                  "shrink-0 border-r last:border-r-0 flex items-center justify-center hover:bg-zinc-100",
-                  d.weekend ? "bg-zinc-50" : "bg-white",
+                  "relative shrink-0 border-r last:border-r-0 flex items-center justify-center",
+                  day.isToday ? "bg-emerald-100" : day.weekend ? "bg-amber-100" : "bg-white",
                 ].join(" ")}
                 style={{ width: "var(--cell)", height: "var(--rowH)" }}
-                onClick={() => onToggle(habit.id, d.iso)}
-                aria-pressed={done}
-                aria-label={`${habit.title} - ${d.iso}`}
-                title={d.iso}
-              >
-                <span
-                  className={[
-                    "rounded-[5px] border",
-                    done ? "border-transparent" : "border-zinc-400",
-                  ].join(" ")}
-                  style={{
-                    width: "16px",
-                    height: "16px",
-                    backgroundColor: done ? habit.color : "transparent",
-                  }}
-                />
-              </button>
+                onClick={() => onToggle(habit.id, day.iso)}
+                label={`${habit.title} - ${day.iso}`}
+              />
             );
           })}
         </div>
@@ -187,85 +171,71 @@ export function HabitMultiMonthGrid({
   mode,
 }: {
   habits: Habit[];
-  completionMap: CompletionMap;
+  completionMap: HabitCompletionMap;
   start: Date;
   end: Date;
   onToggle: (habitId: string, dateISO: string) => void;
   mode: "quarter" | "semester" | "year";
 }) {
+  const todayISO = useMemo(() => toISODate(new Date()), []);
   const months = React.useMemo(() => monthsInRange(start, end), [start, end]);
-  const monthBlocks = React.useMemo(() => months.map((m) => buildMonthMeta(m)), [months]);
+  const monthBlocks = React.useMemo(() => months.map((month) => buildMonthMeta(month, todayISO)), [months, todayISO]);
 
-  // accordion: por padrão, no ano, abre só o mês atual (se estiver no range)
   const currentMonthKey = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${now.getMonth() + 1}`;
   }, []);
 
-  function monthKeyFromLabel(label: string) {
-    // label é tipo "janeiro de 2026" — usamos o start do monthBlocks para chave
-    return label;
-  }
-
   return (
     <div className="space-y-6">
-      {habits.map((h) => (
-        <section key={h.id} className="bg-white border rounded-2xl overflow-hidden">
-          {/* título do hábito */}
-          <div className="px-4 py-3 border-b">
-            <div className="text-base font-semibold ht-colored-title" style={{ color: h.color }}>
-              {h.title}
+      {habits.map((habit) => (
+        <section key={habit.id} className="overflow-hidden rounded-2xl border bg-white">
+          <div className="border-b px-4 py-3">
+            <div className="text-base font-semibold ht-colored-title" style={{ color: habit.color }}>
+              {habit.title}
             </div>
-            <div className="text-xs text-zinc-600 mt-1">
-              {mode === "year"
-                ? "Ano em meses (clique para abrir/fechar cada mês)."
-                : "Meses do período."}
+            <div className="mt-1 text-xs text-zinc-600">
+              {mode === "year" ? "Ano em meses. Datas futuras ficam apenas como previsao." : "Meses do periodo atual."}
             </div>
           </div>
 
           <div className="p-4">
             {mode !== "year" ? (
               <div className="space-y-5">
-                {monthBlocks.map((mb) => (
+                {monthBlocks.map((monthBlock) => (
                   <MonthCard
-                    key={mb.label}
-                    label={mb.label}
-                    days={mb.days}
-                    habit={h}
+                    key={monthBlock.label}
+                    label={monthBlock.label}
+                    days={monthBlock.days}
+                    habit={habit}
                     completionMap={completionMap}
                     onToggle={onToggle}
+                    todayISO={todayISO}
                   />
                 ))}
               </div>
             ) : (
               <div className="space-y-3">
-                {monthBlocks.map((mb) => {
-                  // abre automaticamente o mês atual do mesmo ano quando possível
-                  const mbYear = mb.start.getFullYear();
-                  const mbMonth = mb.start.getMonth() + 1;
-                  const isCurrentMonth = `${mbYear}-${mbMonth}` === currentMonthKey;
+                {monthBlocks.map((monthBlock) => {
+                  const monthKey = `${monthBlock.start.getFullYear()}-${monthBlock.start.getMonth() + 1}`;
+                  const isCurrentMonth = monthKey === currentMonthKey;
 
                   return (
-                    <details
-                      key={mb.label}
-                      className="group bg-white border rounded-2xl overflow-hidden"
-                      open={isCurrentMonth}
-                    >
-                      <summary className="cursor-pointer list-none px-4 py-3 border-b flex items-center justify-between hover:bg-zinc-50">
-                        <div className="text-sm font-semibold capitalize text-zinc-900">
-                          {mb.label}
-                        </div>
+                    <details key={monthBlock.label} className="group overflow-hidden rounded-2xl border bg-white" open={isCurrentMonth}>
+                      <summary className="flex cursor-pointer list-none items-center justify-between border-b px-4 py-3 hover:bg-zinc-50">
+                        <div className="text-sm font-semibold capitalize text-zinc-900">{monthBlock.label}</div>
                         <div className="text-xs text-zinc-600 group-open:hidden">Abrir</div>
-                        <div className="text-xs text-zinc-600 hidden group-open:block">Fechar</div>
+                        <div className="hidden text-xs text-zinc-600 group-open:block">Fechar</div>
                       </summary>
 
                       <div className="p-4">
                         <MonthCard
-                          label={mb.label}
-                          days={mb.days}
-                          habit={h}
+                          label={monthBlock.label}
+                          days={monthBlock.days}
+                          habit={habit}
                           completionMap={completionMap}
                           onToggle={onToggle}
+                          todayISO={todayISO}
                         />
                       </div>
                     </details>
@@ -278,9 +248,7 @@ export function HabitMultiMonthGrid({
       ))}
 
       {habits.length === 0 ? (
-        <div className="bg-white border rounded-2xl p-6 text-sm text-zinc-700">
-          Nenhum hábito ainda. Vá em “Gerenciar” para criar.
-        </div>
+        <div className="rounded-2xl border bg-white p-6 text-sm text-zinc-700">Nenhum habito ainda. Va em “Gerenciar” para criar.</div>
       ) : null}
     </div>
   );

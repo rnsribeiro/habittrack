@@ -48,10 +48,12 @@ create table if not exists public.habit_completions (
   habit_id uuid not null references public.habits (id) on delete cascade,
   date date not null,
   value int not null default 1,
+  status text not null default 'done',
 
   created_at timestamptz not null default now(),
 
-  constraint habit_completions_value_positive check (value > 0)
+  constraint habit_completions_value_positive check (value > 0),
+  constraint habit_completions_status_valid check (status in ('done','partial','missed'))
 );
 
 -- unique para permitir toggle por (habit, date)
@@ -61,6 +63,9 @@ create unique index if not exists habit_completions_unique
 -- índices para queries por período e por hábito
 create index if not exists habit_completions_user_date_idx
   on public.habit_completions (user_id, date);
+
+create index if not exists habit_completions_user_date_status_idx
+  on public.habit_completions (user_id, date, status);
 
 create index if not exists habit_completions_habit_date_idx
   on public.habit_completions (habit_id, date);

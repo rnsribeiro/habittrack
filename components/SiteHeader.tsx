@@ -12,13 +12,10 @@ function NavButton({
   label: string;
 }) {
   const pathname = usePathname();
-  const active = pathname === href;
+  const active = pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <Link
-      href={href}
-      className={`ht-btn ${active ? "ht-btn-active" : ""}`}
-    >
+    <Link href={href} className={`ht-btn ${active ? "ht-btn-active" : ""}`}>
       {label}
     </Link>
   );
@@ -34,29 +31,31 @@ export function SiteHeader() {
 
   return (
     <header className="ht-header">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        {/* Título */}
-        <div className="flex items-center gap-6">
-          <span className="ht-app-title text-lg">
-            HabitTrack
-          </span>
+      <div className="mx-auto max-w-7xl">
+        <div className="ht-header-shell px-4 py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <Link href="/dashboard" className="flex flex-col">
+                <span className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-200/80">
+                  Sistema pessoal
+                </span>
+                <span className="ht-app-title text-2xl">HabitTrack</span>
+              </Link>
 
-          {/* Navegação */}
-          <nav className="flex items-center gap-2">
-            <NavButton href="/habits" label="Hábitos" />            
-            <NavButton href="/dashboard" label="Dashboard" />
-            <NavButton href="/manage" label="Gerenciar" />
-            <span className="px-1">|</span>
-            <NavButton href="/tasks" label="Tarefas" />
-            <span className="px-1">|</span>
-            <NavButton href="/reading" label="Leitura" />
-          </nav>
+              <nav className="flex flex-wrap items-center gap-2">
+                <NavButton href="/habits" label="Hábitos" />
+                <NavButton href="/dashboard" label="Dashboard" />
+                <NavButton href="/manage" label="Gerenciar" />
+                <NavButton href="/tasks" label="Tarefas" />
+                <NavButton href="/reading" label="Leitura" />
+              </nav>
+            </div>
+
+            <button onClick={logout} className="ht-btn ht-btn-danger self-start lg:self-auto">
+              Sair
+            </button>
+          </div>
         </div>
-
-        {/* Ações */}
-        <button onClick={logout} className="ht-btn ht-btn-danger">
-          Sair
-        </button>
       </div>
     </header>
   );

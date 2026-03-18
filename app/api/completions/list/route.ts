@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supa
     .from("habit_completions")
-    .select("habit_id,date")
+    .select("habit_id,date,status")
     .gte("date", start)
     .lte("date", end);
 
