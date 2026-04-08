@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskStatusControl } from "@/components/tasks/TaskStatusControl";
 import { getErrorMessage } from "@/lib/errors";
+import { useI18n } from "@/lib/i18n";
+import { intlLocale } from "@/lib/locale";
 import {
   compareTasksByUrgency,
   formatTaskDateBR,
@@ -18,7 +20,6 @@ import {
   taskStatusLabel,
   taskWhenLabel,
   typeLabel,
-  UNCATEGORIZED_TASK_LABEL,
 } from "@/lib/tasks";
 import type { Task, TaskPriority, TaskStatus, TaskType } from "@/lib/types";
 import { apiFetch } from "@/src/lib/api";
@@ -100,24 +101,24 @@ function getCategoryPalette(label: string) {
   return CATEGORY_PALETTES[hashLabel(label) % CATEGORY_PALETTES.length];
 }
 
-function buildCategoryKey(category: string | null | undefined) {
-  return normalizeTaskCategory(category)?.toLocaleLowerCase("pt-BR") ?? "__uncategorized__";
+function buildCategoryKey(category: string | null | undefined, locale: "pt" | "en") {
+  return normalizeTaskCategory(category)?.toLocaleLowerCase(intlLocale(locale)) ?? "__uncategorized__";
 }
 
-function buildCategoryFilterLabel(value: CategoryFilter) {
-  if (value === "all") return "todas as categorias";
-  if (value === "__uncategorized__") return UNCATEGORIZED_TASK_LABEL.toLowerCase();
+function buildCategoryFilterLabel(value: CategoryFilter, locale: "pt" | "en") {
+  if (value === "all") return locale === "en" ? "all categories" : "todas as categorias";
+  if (value === "__uncategorized__") return taskCategoryLabel(null, locale).toLowerCase();
   return value;
 }
 
-function buildStatusFilterLabel(value: StatusFilter) {
-  if (value === "all") return "todas";
-  if (value === "open") return "abertas";
-  return taskStatusLabel(value).toLowerCase();
+function buildStatusFilterLabel(value: StatusFilter, locale: "pt" | "en") {
+  if (value === "all") return locale === "en" ? "all" : "todas";
+  if (value === "open") return locale === "en" ? "open" : "abertas";
+  return taskStatusLabel(value, locale).toLowerCase();
 }
 
-function sortCategories(categories: { label: string; value: CategoryFilter }[]) {
-  return [...categories].sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+function sortCategories(categories: { label: string; value: CategoryFilter }[], locale: "pt" | "en") {
+  return [...categories].sort((a, b) => a.label.localeCompare(b.label, intlLocale(locale)));
 }
 
 function matchesStatusFilter(task: Task, statusFilter: StatusFilter) {
@@ -128,64 +129,33 @@ function matchesStatusFilter(task: Task, statusFilter: StatusFilter) {
 
 function cardTone(task: Task) {
   if (isTaskOverdue(task)) {
-    return {
-      card: "border-red-200/80 bg-red-50/90",
-      dot: "#ef4444",
-      helper: "text-red-700",
-    };
+    return { card: "border-red-200/80 bg-red-50/90", dot: "#ef4444", helper: "text-red-700" };
   }
 
   const status = getTaskStatus(task);
   if (status === "done") {
-    return {
-      card: "border-emerald-200/80 bg-emerald-50/85",
-      dot: "#22c55e",
-      helper: "text-emerald-700",
-    };
+    return { card: "border-emerald-200/80 bg-emerald-50/85", dot: "#22c55e", helper: "text-emerald-700" };
   }
 
   if (status === "in_progress") {
-    return {
-      card: "border-sky-200/80 bg-sky-50/85",
-      dot: "#0ea5e9",
-      helper: "text-sky-700",
-    };
+    return { card: "border-sky-200/80 bg-sky-50/85", dot: "#0ea5e9", helper: "text-sky-700" };
   }
 
   if (task.priority === "high") {
-    return {
-      card: "border-orange-200/80 bg-orange-50/80",
-      dot: "#f97316",
-      helper: "text-orange-700",
-    };
+    return { card: "border-orange-200/80 bg-orange-50/80", dot: "#f97316", helper: "text-orange-700" };
   }
 
   if (task.priority === "medium") {
-    return {
-      card: "border-violet-200/80 bg-violet-50/80",
-      dot: "#8b5cf6",
-      helper: "text-violet-700",
-    };
+    return { card: "border-violet-200/80 bg-violet-50/80", dot: "#8b5cf6", helper: "text-violet-700" };
   }
 
-  return {
-    card: "border-slate-200/80 bg-white/90",
-    dot: "#64748b",
-    helper: "text-slate-600",
-  };
+  return { card: "border-slate-200/80 bg-white/90", dot: "#64748b", helper: "text-slate-600" };
 }
 
 function statusBadgeClasses(task: Task) {
   const status = getTaskStatus(task);
-
-  if (status === "done") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-
-  if (status === "in_progress") {
-    return "border-sky-200 bg-sky-50 text-sky-700";
-  }
-
+  if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "in_progress") return "border-sky-200 bg-sky-50 text-sky-700";
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
@@ -195,21 +165,11 @@ function priorityBadgeClasses(priority: TaskPriority) {
   return "border-slate-200 bg-white/80 text-slate-700";
 }
 
-function CategoryBadge({
-  label,
-  palette,
-}: {
-  label: string;
-  palette: CategoryPalette;
-}) {
+function CategoryBadge({ label, palette }: { label: string; palette: CategoryPalette }) {
   return (
     <span
       className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-      style={{
-        borderColor: palette.border,
-        background: "rgba(255, 255, 255, 0.72)",
-        color: palette.strongText,
-      }}
+      style={{ borderColor: palette.border, background: "rgba(255, 255, 255, 0.72)", color: palette.strongText }}
     >
       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.accent }} />
       {label}
@@ -222,11 +182,13 @@ function renderAgendaList({
   subtitle,
   items,
   router,
+  locale,
 }: {
   title: string;
   subtitle: string;
   items: Task[];
   router: ReturnType<typeof useRouter>;
+  locale: "pt" | "en";
 }) {
   return (
     <section key={title} className="app-surface overflow-hidden">
@@ -236,10 +198,14 @@ function renderAgendaList({
       </div>
 
       <div className="divide-y divide-slate-200/70">
-        {items.length === 0 ? <div className="px-5 py-6 text-sm text-slate-500">Nada previsto aqui por enquanto.</div> : null}
+        {items.length === 0 ? (
+          <div className="px-5 py-6 text-sm text-slate-500">
+            {locale === "en" ? "Nothing scheduled here yet." : "Nada previsto aqui por enquanto."}
+          </div>
+        ) : null}
 
         {items.map((task) => {
-          const palette = getCategoryPalette(taskCategoryLabel(task.category));
+          const palette = getCategoryPalette(taskCategoryLabel(task.category, locale));
 
           return (
             <div key={task.id} className="px-5 py-4">
@@ -253,19 +219,19 @@ function renderAgendaList({
                   </button>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <CategoryBadge label={taskCategoryLabel(task.category)} palette={palette} />
+                    <CategoryBadge label={taskCategoryLabel(task.category, locale)} palette={palette} />
                     <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(task)}`}>
-                      {taskStatusLabel(task)}
+                      {taskStatusLabel(task, locale)}
                     </span>
                     {isTaskOverdue(task) ? (
                       <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-                        Vencida
+                        {locale === "en" ? "Overdue" : "Vencida"}
                       </span>
                     ) : null}
                   </div>
                 </div>
 
-                <span className="text-right text-xs text-slate-500">{taskWhenLabel(task)}</span>
+                <span className="text-right text-xs text-slate-500">{taskWhenLabel(task, locale)}</span>
               </div>
             </div>
           );
@@ -281,12 +247,14 @@ function renderTaskCard({
   router,
   onStatusChange,
   onRemoveTask,
+  locale,
 }: {
   task: Task;
   palette: CategoryPalette;
   router: ReturnType<typeof useRouter>;
   onStatusChange: (task: Task, status: TaskStatus) => void;
   onRemoveTask: (taskId: string) => void;
+  locale: "pt" | "en";
 }) {
   const tone = cardTone(task);
   const status = getTaskStatus(task);
@@ -306,23 +274,23 @@ function renderTaskCard({
                 {task.title}
               </button>
 
-              <CategoryBadge label={taskCategoryLabel(task.category)} palette={palette} />
+              <CategoryBadge label={taskCategoryLabel(task.category, locale)} palette={palette} />
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClasses(task)}`}>
-                {taskStatusLabel(status)}
+                {taskStatusLabel(status, locale)}
               </span>
               {overdue ? (
                 <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-                  Vencida
+                  {locale === "en" ? "Overdue" : "Vencida"}
                 </span>
               ) : null}
               <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${priorityBadgeClasses(task.priority)}`}>
-                Prioridade {priorityLabel(task.priority).toLowerCase()}
+                {locale === "en" ? "Priority" : "Prioridade"} {priorityLabel(task.priority, locale).toLowerCase()}
               </span>
               <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">
-                {typeLabel(task.task_type)}
+                {typeLabel(task.task_type, locale)}
               </span>
             </div>
 
@@ -331,25 +299,29 @@ function renderTaskCard({
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className={`flex items-center gap-2 text-sm font-medium ${tone.helper}`}>
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tone.dot }} />
-                {taskWhenLabel(task)}
+                {taskWhenLabel(task, locale)}
               </div>
 
               <div className="text-xs text-slate-500">
-                Criada em{" "}
-                {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(task.created_at))}
+                {locale === "en" ? "Created on " : "Criada em "}
+                {new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "short", timeStyle: "short" }).format(new Date(task.created_at))}
               </div>
             </div>
           </div>
 
-        <button onClick={() => onRemoveTask(task.id)} className="app-btn app-btn-danger w-full shrink-0 sm:w-auto">
-          Excluir
-        </button>
-      </div>
+          <button onClick={() => onRemoveTask(task.id)} className="app-btn app-btn-danger w-full shrink-0 sm:w-auto">
+            {locale === "en" ? "Delete" : "Excluir"}
+          </button>
+        </div>
 
         <div className="rounded-[20px] border border-white/80 bg-white/75 p-3">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status rapido</div>
-            <div className="text-xs text-slate-500">Atualize sem sair da lista.</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {locale === "en" ? "Quick status" : "Status rapido"}
+            </div>
+            <div className="text-xs text-slate-500">
+              {locale === "en" ? "Update it without leaving the list." : "Atualize sem sair da lista."}
+            </div>
           </div>
 
           <TaskStatusControl value={status} onChange={(nextStatus) => onStatusChange(task, nextStatus)} />
@@ -361,7 +333,146 @@ function renderTaskCard({
 
 export default function TasksPage() {
   const { ready } = useRequireSession("/login");
+  const { locale } = useI18n();
   const router = useRouter();
+
+  const copy =
+    locale === "en"
+      ? {
+          loading: "Loading...",
+          heroKicker: "Smart planning",
+          heroTitle: "Tasks with real status and mobile-first flow",
+          heroSubtitle:
+            "Separate what is still to do, what is already in progress, and what is complete while keeping category grouping and urgency visibility.",
+          todo: "To do",
+          todoHint: "Pending work that has not started yet.",
+          progress: "In progress",
+          progressHint: "Items that already have momentum.",
+          done: "Done",
+          doneHint: "Resolved and out of the main queue.",
+          overdue: "Overdue",
+          overdueHint: "Late tasks asking for attention.",
+          open: "Open",
+          all: "All",
+          type: "Type",
+          category: "Category",
+          allTypes: "All types",
+          dueType: "With deadline",
+          scheduledType: "Scheduled",
+          flexibleType: "Flexible",
+          allCategories: "All categories",
+          newTaskKicker: "New task",
+          newTaskTitle: "Capture, categorize, and flag the current state",
+          newTaskHintPrefix: "If category is empty, the task goes to",
+          titleLabel: "Title",
+          titlePlaceholder: "Example: Prepare Monday meeting",
+          categoryPlaceholder: "Example: Work, Home, Study",
+          priority: "Priority",
+          low: "Low",
+          medium: "Medium",
+          high: "High",
+          initialStatus: "Initial status",
+          initialStatusHint: 'Use "In progress" when the task has already started.',
+          notes: "Description or notes",
+          notesPlaceholder: "Context, next steps, or important links.",
+          dateLimit: "Due date",
+          dateTime: "Date and time",
+          createTask: "Create task",
+          activeFilter: "Active filter",
+          today: "Today",
+          tomorrow: "Tomorrow",
+        }
+      : {
+          loading: "Carregando...",
+          heroKicker: "Planejamento inteligente",
+          heroTitle: "Tarefas com estado real e foco mobile",
+          heroSubtitle:
+            "Agora voce consegue separar o que ainda esta a fazer, o que ja esta em andamento e o que foi concluido, mantendo o agrupamento por categoria e a leitura por urgencia.",
+          todo: "A fazer",
+          todoHint: "Pendencias ainda nao iniciadas.",
+          progress: "Em andamento",
+          progressHint: "Itens que ja ganharam tracao.",
+          done: "Concluidas",
+          doneHint: "Resolvidas e fora da fila principal.",
+          overdue: "Vencidas",
+          overdueHint: "Tarefas atrasadas pedindo atencao.",
+          open: "Abertas",
+          all: "Todas",
+          type: "Tipo",
+          category: "Categoria",
+          allTypes: "Todos os tipos",
+          dueType: "Com prazo",
+          scheduledType: "Agendadas",
+          flexibleType: "Flexiveis",
+          allCategories: "Todas as categorias",
+          newTaskKicker: "Nova tarefa",
+          newTaskTitle: "Capture, categorize e sinalize o momento atual",
+          newTaskHintPrefix: "Se a categoria ficar vazia, a tarefa entra em",
+          titleLabel: "Titulo",
+          titlePlaceholder: "Ex: Preparar reuniao de segunda",
+          categoryPlaceholder: "Ex: Trabalho, Casa, Estudos",
+          priority: "Prioridade",
+          low: "Baixa",
+          medium: "Media",
+          high: "Alta",
+          initialStatus: "Status inicial",
+          initialStatusHint: 'Use "Em andamento" quando a tarefa ja tiver sido iniciada.',
+          notes: "Descricao ou notas",
+          notesPlaceholder: "Contexto, proximos passos ou links importantes.",
+          dateLimit: "Data limite",
+          dateTime: "Data e hora",
+          createTask: "Criar tarefa",
+          activeFilter: "Filtro ativo",
+          today: "Hoje",
+          tomorrow: "Amanha",
+        };
+
+  const moreCopy =
+    locale === "en"
+      ? {
+          todaySubtitle: "task(s) scheduled for today",
+          tomorrowSubtitle: "task(s) scheduled for the next day",
+          smartList: "Smart list",
+          groupedTitle: "Grouped by category, state, and urgency",
+          groupsSummary: "group(s)",
+          tasksSummary: "task(s)",
+          noTasks: "No tasks found with the current filters.",
+          inGroup: "task(s) in this group",
+          firstItem: "First item",
+          noDate: "No date",
+          confirmDelete: "Do you want to delete this task?",
+          errors: {
+            load: "Could not load tasks.",
+            title: "Please enter a title.",
+            dueDate: "Please enter the due date.",
+            scheduledAt: "Please enter the scheduled date.",
+            create: "Could not create the task.",
+            update: "Could not update the task.",
+            remove: "Could not remove the task.",
+          },
+        }
+      : {
+          todaySubtitle: "tarefa(s) previstas para hoje",
+          tomorrowSubtitle: "tarefa(s) previstas para o proximo dia",
+          smartList: "Lista inteligente",
+          groupedTitle: "Agrupada por categoria, estado e urgencia",
+          groupsSummary: "grupo(s)",
+          tasksSummary: "tarefa(s)",
+          noTasks: "Nenhuma tarefa encontrada com os filtros atuais.",
+          inGroup: "tarefa(s) neste grupo",
+          firstItem: "Primeiro item",
+          noDate: "Sem data",
+          confirmDelete: "Deseja excluir esta tarefa?",
+          errors: {
+            load: "Erro ao carregar tarefas.",
+            title: "Informe um titulo.",
+            dueDate: "Informe a data limite.",
+            scheduledAt: "Informe a data especifica.",
+            create: "Erro ao criar tarefa.",
+            update: "Erro ao atualizar tarefa.",
+            remove: "Erro ao remover tarefa.",
+          },
+        };
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [agendaTasks, setAgendaTasks] = useState<Task[]>([]);
@@ -404,18 +515,18 @@ export default function TasksPage() {
         continue;
       }
 
-      const key = normalized.toLocaleLowerCase("pt-BR");
+      const key = normalized.toLocaleLowerCase(intlLocale(locale));
       if (!items.has(key)) {
         items.set(key, { label: normalized, value: normalized });
       }
     }
 
-    const sorted = sortCategories([...items.values()]);
+    const sorted = sortCategories([...items.values()], locale);
     if (hasUncategorized) {
-      sorted.push({ label: UNCATEGORIZED_TASK_LABEL, value: "__uncategorized__" });
+      sorted.push({ label: taskCategoryLabel(null, locale), value: "__uncategorized__" });
     }
     return sorted;
-  }, [agendaTasks, tasks]);
+  }, [agendaTasks, locale, tasks]);
 
   const safeCategoryFilter = useMemo<CategoryFilter>(() => {
     if (categoryFilter === "all") return "all";
@@ -441,26 +552,21 @@ export default function TasksPage() {
 
     return statusFilteredTasks.filter(
       (task) =>
-        normalizeTaskCategory(task.category)?.toLocaleLowerCase("pt-BR") === safeCategoryFilter.toLocaleLowerCase("pt-BR")
+        normalizeTaskCategory(task.category)?.toLocaleLowerCase(intlLocale(locale)) ===
+        safeCategoryFilter.toLocaleLowerCase(intlLocale(locale))
     );
-  }, [safeCategoryFilter, statusFilteredTasks]);
+  }, [locale, safeCategoryFilter, statusFilteredTasks]);
 
   const groupedTasks = useMemo<CategoryGroup[]>(() => {
     const grouped = new Map<string, CategoryGroup>();
 
     for (const task of [...visibleTasks].sort(compareTasksByUrgency)) {
-      const label = taskCategoryLabel(task.category);
-      const key = buildCategoryKey(task.category);
+      const label = taskCategoryLabel(task.category, locale);
+      const key = buildCategoryKey(task.category, locale);
       const palette = getCategoryPalette(label);
 
       if (!grouped.has(key)) {
-        grouped.set(key, {
-          key,
-          label,
-          tasks: [],
-          palette,
-          overdueCount: 0,
-        });
+        grouped.set(key, { key, label, tasks: [], palette, overdueCount: 0 });
       }
 
       const group = grouped.get(key)!;
@@ -471,9 +577,9 @@ export default function TasksPage() {
     return [...grouped.values()].sort((a, b) => {
       const urgencyDiff = compareTasksByUrgency(a.tasks[0], b.tasks[0]);
       if (urgencyDiff !== 0) return urgencyDiff;
-      return a.label.localeCompare(b.label, "pt-BR");
+      return a.label.localeCompare(b.label, intlLocale(locale));
     });
-  }, [visibleTasks]);
+  }, [locale, visibleTasks]);
 
   const stats = useMemo(() => {
     const todo = tasks.filter((task) => getTaskStatus(task) === "todo").length;
@@ -496,22 +602,21 @@ export default function TasksPage() {
     (async () => {
       setErrorMsg(null);
       try {
-        const qs = queryString ? `?${queryString}` : "";
-        const [listResponse, agendaResponse] = await Promise.all([apiFetch(`/api/tasks${qs}`), apiFetch("/api/tasks?done=false")]);
-
+        const querySuffix = queryString ? `?${queryString}` : "";
+        const [listResponse, agendaResponse] = await Promise.all([apiFetch(`/api/tasks${querySuffix}`), apiFetch("/api/tasks?done=false")]);
         setTasks(listResponse.tasks ?? []);
         setAgendaTasks(agendaResponse.tasks ?? []);
       } catch (error: unknown) {
-        setErrorMsg(getErrorMessage(error, "Erro ao carregar tarefas."));
+        setErrorMsg(getErrorMessage(error, moreCopy.errors.load));
       }
     })();
-  }, [queryString, ready]);
+  }, [moreCopy.errors.load, queryString, ready]);
 
   async function createTask() {
     setErrorMsg(null);
 
     if (!title.trim()) {
-      setErrorMsg("Informe um titulo.");
+      setErrorMsg(moreCopy.errors.title);
       return;
     }
 
@@ -526,7 +631,7 @@ export default function TasksPage() {
 
     if (taskType === "due") {
       if (!dueDate) {
-        setErrorMsg("Informe a data limite.");
+        setErrorMsg(moreCopy.errors.dueDate);
         return;
       }
       payload.due_date = dueDate;
@@ -534,21 +639,16 @@ export default function TasksPage() {
 
     if (taskType === "scheduled") {
       if (!scheduledAt) {
-        setErrorMsg("Informe a data especifica.");
+        setErrorMsg(moreCopy.errors.scheduledAt);
         return;
       }
       payload.scheduled_at = new Date(scheduledAt).toISOString();
     }
 
     try {
-      const { task } = await apiFetch("/api/tasks", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
+      const { task } = await apiFetch("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
       setTasks((current) => [task, ...current]);
       setAgendaTasks((current) => [task, ...current]);
-
       setTitle("");
       setNotes("");
       setCategory("");
@@ -558,7 +658,7 @@ export default function TasksPage() {
       setDueDate("");
       setScheduledAt("");
     } catch (error: unknown) {
-      setErrorMsg(getErrorMessage(error, "Erro ao criar tarefa."));
+      setErrorMsg(getErrorMessage(error, moreCopy.errors.create));
     }
   }
 
@@ -587,12 +687,12 @@ export default function TasksPage() {
     } catch (error: unknown) {
       setTasks(snapshotTasks);
       setAgendaTasks(snapshotAgenda);
-      setErrorMsg(getErrorMessage(error, "Erro ao atualizar tarefa."));
+      setErrorMsg(getErrorMessage(error, moreCopy.errors.update));
     }
   }
 
   async function removeTask(taskId: string) {
-    const confirmed = confirm("Deseja excluir esta tarefa?");
+    const confirmed = confirm(moreCopy.confirmDelete);
     if (!confirmed) return;
 
     const snapshotTasks = tasks;
@@ -606,48 +706,45 @@ export default function TasksPage() {
     } catch (error: unknown) {
       setTasks(snapshotTasks);
       setAgendaTasks(snapshotAgenda);
-      setErrorMsg(getErrorMessage(error, "Erro ao remover tarefa."));
+      setErrorMsg(getErrorMessage(error, moreCopy.errors.remove));
     }
   }
 
-  if (!ready) return <div className="p-6 text-sm text-slate-300">Carregando...</div>;
+  if (!ready) return <div className="p-6 text-sm text-slate-300">{copy.loading}</div>;
 
   return (
     <div className="app-page pb-4">
       <section className="app-surface-dark overflow-hidden p-5 sm:p-7">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl">
-            <span className="app-kicker">Planejamento inteligente</span>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Tarefas com estado real e foco mobile</h1>
-            <p className="app-subtle-dark mt-3 max-w-2xl text-sm leading-6 sm:text-base">
-              Agora voce consegue separar o que ainda esta a fazer, o que ja esta em andamento e o que foi concluido,
-              mantendo o agrupamento por categoria e a leitura por urgencia.
-            </p>
+            <span className="app-kicker">{copy.heroKicker}</span>
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">{copy.heroTitle}</h1>
+            <p className="app-subtle-dark mt-3 max-w-2xl text-sm leading-6 sm:text-base">{copy.heroSubtitle}</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[28rem] xl:grid-cols-2">
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">A fazer</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">{copy.todo}</div>
               <div className="mt-2 text-3xl font-semibold text-white">{stats.todo}</div>
-              <div className="mt-1 text-sm text-slate-300">Pendencias ainda nao iniciadas.</div>
+              <div className="mt-1 text-sm text-slate-300">{copy.todoHint}</div>
             </div>
 
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Em andamento</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">{copy.progress}</div>
               <div className="mt-2 text-3xl font-semibold text-white">{stats.inProgress}</div>
-              <div className="mt-1 text-sm text-slate-300">Itens que ja ganharam tracao.</div>
+              <div className="mt-1 text-sm text-slate-300">{copy.progressHint}</div>
             </div>
 
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Concluidas</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">{copy.done}</div>
               <div className="mt-2 text-3xl font-semibold text-white">{stats.done}</div>
-              <div className="mt-1 text-sm text-slate-300">Resolvidas e fora da fila principal.</div>
+              <div className="mt-1 text-sm text-slate-300">{copy.doneHint}</div>
             </div>
 
             <div className="rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">Vencidas</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300">{copy.overdue}</div>
               <div className="mt-2 text-3xl font-semibold text-white">{stats.overdue}</div>
-              <div className="mt-1 text-sm text-slate-300">Tarefas atrasadas pedindo atencao.</div>
+              <div className="mt-1 text-sm text-slate-300">{copy.overdueHint}</div>
             </div>
           </div>
         </div>
@@ -661,37 +758,37 @@ export default function TasksPage() {
                 className={`app-chip ${statusFilter === value ? "app-chip-active" : "app-chip-muted"}`}
               >
                 {value === "open"
-                  ? "Abertas"
+                  ? copy.open
                   : value === "todo"
-                    ? "A fazer"
+                    ? taskStatusLabel("todo", locale)
                     : value === "in_progress"
-                      ? "Em andamento"
+                      ? taskStatusLabel("in_progress", locale)
                       : value === "done"
-                        ? "Concluidas"
-                        : "Todas"}
+                        ? taskStatusLabel("done", locale)
+                        : copy.all}
               </button>
             ))}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[32rem]">
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-200">Tipo</label>
+              <label className="mb-2 block text-sm font-medium text-slate-200">{copy.type}</label>
               <select className="app-select" value={filter} onChange={(event) => setFilter(event.target.value as Filter)}>
-                <option value="all">Todos os tipos</option>
-                <option value="due">Com prazo</option>
-                <option value="scheduled">Agendadas</option>
-                <option value="anytime">Flexiveis</option>
+                <option value="all">{copy.allTypes}</option>
+                <option value="due">{copy.dueType}</option>
+                <option value="scheduled">{copy.scheduledType}</option>
+                <option value="anytime">{copy.flexibleType}</option>
               </select>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-200">Categoria</label>
+              <label className="mb-2 block text-sm font-medium text-slate-200">{copy.category}</label>
               <select
                 className="app-select"
                 value={safeCategoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value as CategoryFilter)}
               >
-                <option value="all">Todas as categorias</option>
+                <option value="all">{copy.allCategories}</option>
                 {categoryOptions.map((item) => (
                   <option key={`${item.value}`} value={item.value}>
                     {item.label}
@@ -703,196 +800,134 @@ export default function TasksPage() {
         </div>
       </section>
 
-      {errorMsg ? (
-        <div className="rounded-[22px] border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-700">{errorMsg}</div>
-      ) : null}
+      {errorMsg ? <div className="rounded-[22px] border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-700">{errorMsg}</div> : null}
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,360px)]">
         <div className="app-surface p-5 sm:p-6">
           <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">Nova tarefa</div>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">Capture, categorize e sinalize o momento atual</h2>
+            <div className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700">{copy.newTaskKicker}</div>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">{copy.newTaskTitle}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Se a categoria ficar vazia, a tarefa entra em <strong>{UNCATEGORIZED_TASK_LABEL}</strong>.
+              {copy.newTaskHintPrefix} <strong>{taskCategoryLabel(null, locale)}</strong>.
             </p>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">Titulo</label>
-              <input
-                className="app-input"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Ex: Preparar reuniao de segunda"
-              />
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.titleLabel}</label>
+              <input className="app-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder={copy.titlePlaceholder} />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">Categoria</label>
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.category}</label>
               <input
                 className="app-input"
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                placeholder="Ex: Trabalho, Casa, Estudos"
+                placeholder={copy.categoryPlaceholder}
                 list="task-categories"
               />
               <datalist id="task-categories">
-                {categoryOptions
-                  .filter((item) => item.value !== "__uncategorized__")
-                  .map((item) => (
-                    <option key={item.label} value={item.label} />
-                  ))}
+                {categoryOptions.filter((item) => item.value !== "__uncategorized__").map((item) => <option key={item.label} value={item.label} />)}
               </datalist>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">Prioridade</label>
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.priority}</label>
               <select className="app-select" value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
-                <option value="low">Baixa</option>
-                <option value="medium">Media</option>
-                <option value="high">Alta</option>
+                <option value="low">{copy.low}</option>
+                <option value="medium">{copy.medium}</option>
+                <option value="high">{copy.high}</option>
               </select>
             </div>
 
             <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">Status inicial</label>
-              <p className="mb-3 text-sm text-slate-500">Use &quot;Em andamento&quot; quando a tarefa ja tiver sido iniciada.</p>
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.initialStatus}</label>
+              <p className="mb-3 text-sm text-slate-500">{copy.initialStatusHint}</p>
               <TaskStatusControl value={taskStatus} onChange={setTaskStatus} />
             </div>
 
             <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">Descricao ou notas</label>
-              <textarea
-                className="app-textarea"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Contexto, proximos passos ou links importantes."
-              />
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.notes}</label>
+              <textarea className="app-textarea" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={copy.notesPlaceholder} />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">Tipo</label>
+              <label className="mb-2 block text-sm font-medium text-slate-700">{copy.type}</label>
               <select className="app-select" value={taskType} onChange={(event) => setTaskType(event.target.value as TaskType)}>
-                <option value="due">Com prazo</option>
-                <option value="scheduled">Agendada</option>
-                <option value="anytime">Flexivel</option>
+                <option value="due">{copy.dueType}</option>
+                <option value="scheduled">{copy.scheduledType}</option>
+                <option value="anytime">{copy.flexibleType}</option>
               </select>
             </div>
 
             {taskType === "due" ? (
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Data limite</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">{copy.dateLimit}</label>
                 <input type="date" className="app-input" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               </div>
             ) : null}
 
             {taskType === "scheduled" ? (
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">Data e hora</label>
-                <input
-                  type="datetime-local"
-                  className="app-input"
-                  value={scheduledAt}
-                  onChange={(event) => setScheduledAt(event.target.value)}
-                />
+                <label className="mb-2 block text-sm font-medium text-slate-700">{copy.dateTime}</label>
+                <input type="datetime-local" className="app-input" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />
               </div>
             ) : null}
           </div>
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button onClick={createTask} className="app-btn app-btn-primary w-full sm:w-auto">
-              Criar tarefa
-            </button>
+            <button onClick={createTask} className="app-btn app-btn-primary w-full sm:w-auto">{copy.createTask}</button>
 
             <div className="text-sm text-slate-500">
-              Filtro ativo:{" "}
-              <span className="font-semibold text-slate-700">
-                {buildStatusFilterLabel(statusFilter)} em {buildCategoryFilterLabel(safeCategoryFilter)}
-              </span>
+              {copy.activeFilter}: <span className="font-semibold text-slate-700">{buildStatusFilterLabel(statusFilter, locale)} {locale === "en" ? "in" : "em"} {buildCategoryFilterLabel(safeCategoryFilter, locale)}</span>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          {renderAgendaList({
-            title: "Hoje",
-            subtitle: `${agenda.todayList.length} tarefa(s) previstas para hoje`,
-            items: agenda.todayList,
-            router,
-          })}
-          {renderAgendaList({
-            title: "Amanha",
-            subtitle: `${agenda.tomorrowList.length} tarefa(s) previstas para o proximo dia`,
-            items: agenda.tomorrowList,
-            router,
-          })}
+          {renderAgendaList({ title: copy.today, subtitle: `${agenda.todayList.length} ${moreCopy.todaySubtitle}`, items: agenda.todayList, router, locale })}
+          {renderAgendaList({ title: copy.tomorrow, subtitle: `${agenda.tomorrowList.length} ${moreCopy.tomorrowSubtitle}`, items: agenda.tomorrowList, router, locale })}
         </div>
       </section>
 
       <section className="app-page">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-300">Lista inteligente</span>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Agrupada por categoria, estado e urgencia</h2>
+            <span className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-300">{moreCopy.smartList}</span>
+            <h2 className="mt-2 text-2xl font-semibold text-white">{moreCopy.groupedTitle}</h2>
           </div>
 
           <div className="text-sm text-slate-300">
-            {visibleTasks.length} tarefa(s) em <span className="font-semibold text-white">{groupedTasks.length}</span> grupo(s)
+            {visibleTasks.length} {moreCopy.tasksSummary} {locale === "en" ? "in" : "em"} <span className="font-semibold text-white">{groupedTasks.length}</span> {moreCopy.groupsSummary}
           </div>
         </div>
 
-        {groupedTasks.length === 0 ? (
-          <div className="app-surface p-8 text-center text-slate-500">Nenhuma tarefa encontrada com os filtros atuais.</div>
-        ) : null}
+        {groupedTasks.length === 0 ? <div className="app-surface p-8 text-center text-slate-500">{moreCopy.noTasks}</div> : null}
 
         {groupedTasks.map((group) => (
-          <section
-            key={group.key}
-            className="app-surface overflow-hidden"
-            style={{
-              borderColor: group.palette.border,
-              boxShadow: group.palette.glow,
-            }}
-          >
+          <section key={group.key} className="app-surface overflow-hidden" style={{ borderColor: group.palette.border, boxShadow: group.palette.glow }}>
             <div className="border-b px-5 py-4" style={{ background: group.palette.soft, borderColor: group.palette.border }}>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <span className="h-3 w-3 rounded-full" style={{ backgroundColor: group.palette.accent }} />
                   <div>
-                    <h3 className="text-lg font-semibold" style={{ color: group.palette.strongText }}>
-                      {group.label}
-                    </h3>
+                    <h3 className="text-lg font-semibold" style={{ color: group.palette.strongText }}>{group.label}</h3>
                     <p className="text-sm text-slate-600">
-                      {group.tasks.length} tarefa(s) neste grupo
-                      {group.overdueCount > 0 ? ` - ${group.overdueCount} vencida(s)` : ""}
+                      {group.tasks.length} {moreCopy.inGroup}
+                      {group.overdueCount > 0 ? (locale === "en" ? ` - ${group.overdueCount} overdue` : ` - ${group.overdueCount} vencida(s)`) : ""}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-sm text-slate-600">
-                  Primeiro item:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {group.tasks[0].task_type === "due" && group.tasks[0].due_date
-                      ? formatTaskDateBR(group.tasks[0].due_date)
-                      : group.tasks[0].task_type === "scheduled" && group.tasks[0].scheduled_at
-                        ? formatTaskDateTimeBR(group.tasks[0].scheduled_at)
-                        : "Sem data"}
-                  </span>
+                  {moreCopy.firstItem}: <span className="font-semibold text-slate-900">{group.tasks[0].task_type === "due" && group.tasks[0].due_date ? formatTaskDateBR(group.tasks[0].due_date, locale) : group.tasks[0].task_type === "scheduled" && group.tasks[0].scheduled_at ? formatTaskDateTimeBR(group.tasks[0].scheduled_at, locale) : moreCopy.noDate}</span>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-4 p-5 2xl:grid-cols-2">
-              {group.tasks.map((task) =>
-                renderTaskCard({
-                  task,
-                  palette: group.palette,
-                  router,
-                  onStatusChange: updateTaskStatus,
-                  onRemoveTask: removeTask,
-                })
-              )}
+              {group.tasks.map((task) => renderTaskCard({ task, palette: group.palette, router, onStatusChange: updateTaskStatus, onRemoveTask: removeTask, locale }))}
             </div>
           </section>
         ))}

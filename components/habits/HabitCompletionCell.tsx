@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useI18n } from "@/lib/i18n";
 import { habitCompletionLabel } from "@/lib/habits";
 import type { HabitCompletionStatus } from "@/lib/types";
 
@@ -12,7 +13,7 @@ function markAppearance(status: HabitCompletionStatus | null, color: string) {
         borderColor: color,
         backgroundColor: color,
       } satisfies CSSProperties,
-      label: "✓",
+      label: "\u2713",
     };
   }
 
@@ -24,18 +25,6 @@ function markAppearance(status: HabitCompletionStatus | null, color: string) {
         background: `linear-gradient(90deg, ${color} 50%, rgba(255,255,255,0.92) 50%)`,
       } satisfies CSSProperties,
       label: "",
-    };
-  }
-
-  if (status === "missed") {
-    return {
-      className: "flex items-center justify-center rounded-[6px] border text-[10px] font-bold uppercase",
-      style: {
-        borderColor: "#ef4444",
-        color: "#ef4444",
-        backgroundColor: "rgba(254,242,242,0.98)",
-      } satisfies CSSProperties,
-      label: "x",
     };
   }
 
@@ -63,17 +52,22 @@ export function HabitCompletionCell({
   onClick?: () => void;
   label: string;
 }) {
+  const { locale } = useI18n();
   const mark = markAppearance(status, color);
 
   return (
     <button
       type="button"
-      className={[className, canMark ? "cursor-pointer hover:bg-emerald-100/80" : "cursor-default"].join(" ")}
+      className={[
+        className,
+        canMark ? "cursor-pointer hover:bg-emerald-100/80" : "cursor-default",
+        "touch-manipulation focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+      ].join(" ")}
       style={style}
       onClick={canMark ? onClick : undefined}
       disabled={!canMark}
-      aria-label={`${label} - ${habitCompletionLabel(status)}`}
-      title={`${label} - ${habitCompletionLabel(status)}`}
+      aria-label={`${label} - ${habitCompletionLabel(status, locale)}`}
+      title={`${label} - ${habitCompletionLabel(status, locale)}`}
     >
       <span
         className={mark.className}

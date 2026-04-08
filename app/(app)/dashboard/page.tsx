@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PeriodControls } from "@/components/PeriodControls";
 import { getErrorMessage } from "@/lib/errors";
 import { formatHabitScore, habitCompletionWeight, type HabitCompletionMap } from "@/lib/habits";
+import { useI18n } from "@/lib/i18n";
 import type { Habit, HabitCompletion } from "@/lib/types";
-import { apiFetch } from "@/src/lib/api";
-import { useRequireSession } from "@/src/lib/useRequireSession";
-import { PeriodControls } from "@/components/PeriodControls";
 import type { Period } from "@/src/lib/period";
 import { getPeriodRange, shiftAnchor, toISODate } from "@/src/lib/period";
+import { apiFetch } from "@/src/lib/api";
+import { useRequireSession } from "@/src/lib/useRequireSession";
 
 function eachDayISO(start: Date, end: Date) {
   const result: string[] = [];
@@ -57,6 +58,36 @@ function expectedDatesForHabitInRange(habit: Habit, start: Date, end: Date) {
 
 export default function DashboardPage() {
   const { ready } = useRequireSession("/login");
+  const { locale } = useI18n();
+
+  const copy =
+    locale === "en"
+      ? {
+          loading: "Loading...",
+          title: "Dashboard",
+          subtitle: "Partial marks count as half a point in progress.",
+          totalDone: "Completed (overall)",
+          expectedMarks: "expected marks in this period",
+          perHabit: "By habit",
+          empty: "No habits created yet. Go to Manage.",
+          errors: {
+            habits: "Could not load habits.",
+            completions: "Could not load completions.",
+          },
+        }
+      : {
+          loading: "Carregando...",
+          title: "Dashboard",
+          subtitle: "Marcacoes parciais contam como meio ponto no progresso.",
+          totalDone: "Concluido (geral)",
+          expectedMarks: "marcacoes esperadas no periodo",
+          perHabit: "Por habito",
+          empty: "Nenhum habito cadastrado. Va em Gerenciar.",
+          errors: {
+            habits: "Erro ao carregar habitos.",
+            completions: "Erro ao carregar marcacoes.",
+          },
+        };
 
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completionMap, setCompletionMap] = useState<HabitCompletionMap>({});
@@ -80,10 +111,10 @@ export default function DashboardPage() {
         const response = await apiFetch("/api/habits");
         setHabits(response.habits ?? []);
       } catch (error: unknown) {
-        setErrorMsg(getErrorMessage(error, "Erro ao carregar habitos."));
+        setErrorMsg(getErrorMessage(error, copy.errors.habits));
       }
     })();
-  }, [ready]);
+  }, [copy.errors.habits, ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -101,10 +132,10 @@ export default function DashboardPage() {
         }
         setCompletionMap(map);
       } catch (error: unknown) {
-        setErrorMsg(getErrorMessage(error, "Erro ao carregar marcacoes."));
+        setErrorMsg(getErrorMessage(error, copy.errors.completions));
       }
     })();
-  }, [range.end, range.start, ready]);
+  }, [copy.errors.completions, range.end, range.start, ready]);
 
   const stats = useMemo(() => {
     const perHabit = habits.map((habit) => {
@@ -137,14 +168,14 @@ export default function DashboardPage() {
     return { perHabit, totalExpected, totalDoneEquivalent, totalPct };
   }, [completionMap, habits, range.end, range.start]);
 
-  if (!ready) return <div className="p-6 text-sm text-zinc-600">Carregando...</div>;
+  if (!ready) return <div className="p-6 text-sm text-zinc-600">{copy.loading}</div>;
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-6">
       <div className="space-y-2">
         <div>
-          <h1 className="text-xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-zinc-600">Marcacoes parciais contam como meio ponto no progresso.</p>
+          <h1 className="text-xl font-semibold">{copy.title}</h1>
+          <p className="text-sm text-zinc-600">{copy.subtitle}</p>
         </div>
 
         <PeriodControls
@@ -168,44 +199,44 @@ export default function DashboardPage() {
 
       {errorMsg ? <div className="rounded-xl border bg-zinc-50 px-3 py-2 text-sm">{errorMsg}</div> : null}
 
-      <div className="bg-white border rounded-2xl p-4">
-        <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+      <div className="rounded-2xl border bg-white p-4">
+        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <div>
-            <div className="text-sm text-zinc-600">Concluido (geral)</div>
+            <div className="text-sm text-zinc-600">{copy.totalDone}</div>
             <div className="text-2xl font-semibold">{stats.totalPct}%</div>
-            <div className="text-xs text-zinc-500 mt-1">
-              {formatHabitScore(stats.totalDoneEquivalent)} de {stats.totalExpected} marcacoes esperadas no periodo
+            <div className="mt-1 text-xs text-zinc-500">
+              {formatHabitScore(stats.totalDoneEquivalent, locale)} de {stats.totalExpected} {copy.expectedMarks}
             </div>
           </div>
 
           <div className="w-full sm:w-72">
-            <div className="h-3 w-full rounded-full bg-zinc-100 overflow-hidden">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100">
               <div className="h-full bg-black" style={{ width: `${stats.totalPct}%` }} />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white border rounded-2xl overflow-hidden">
-        <div className="px-4 py-3 border-b font-medium">Por habito</div>
+      <div className="overflow-hidden rounded-2xl border bg-white">
+        <div className="border-b px-4 py-3 font-medium">{copy.perHabit}</div>
 
         {stats.perHabit.length === 0 ? (
-          <div className="p-4 text-sm text-zinc-600">Nenhum habito cadastrado. Va em “Gerenciar”.</div>
+          <div className="p-4 text-sm text-zinc-600">{copy.empty}</div>
         ) : (
           <ul className="divide-y">
             {stats.perHabit.map((row) => (
-              <li key={row.id} className="p-4 flex items-center justify-between gap-4">
+              <li key={row.id} className="flex items-center justify-between gap-4 p-4">
                 <div className="min-w-0">
-                  <div className="font-medium truncate" style={{ color: row.color }}>
+                  <div className="truncate font-medium" style={{ color: row.color }}>
                     {row.title}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {formatHabitScore(row.doneEquivalent)} de {row.expected} ({row.pct}%)
+                  <div className="mt-1 text-xs text-zinc-500">
+                    {formatHabitScore(row.doneEquivalent, locale)} de {row.expected} ({row.pct}%)
                   </div>
                 </div>
 
                 <div className="w-56">
-                  <div className="h-3 w-full rounded-full bg-zinc-100 overflow-hidden">
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100">
                     <div className="h-full" style={{ width: `${row.pct}%`, backgroundColor: row.color }} />
                   </div>
                 </div>

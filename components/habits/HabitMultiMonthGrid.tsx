@@ -1,23 +1,34 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useI18n } from "@/lib/i18n";
 import { canMarkHabitDate, type HabitCompletionMap } from "@/lib/habits";
 import type { Habit } from "@/lib/types";
-import { toISODate, startOfMonth, endOfMonth } from "@/src/lib/period";
+import { endOfMonth, startOfMonth, toISODate } from "@/src/lib/period";
 import { HabitCompletionCell } from "@/components/habits/HabitCompletionCell";
 
-const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-const WEEKDAY_FULL_PT = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
+const WEEKDAY_INITIALS = {
+  pt: ["D", "S", "T", "Q", "Q", "S", "S"],
+  en: ["S", "M", "T", "W", "T", "F", "S"],
+};
 
-function isWeekend(dow: number) {
-  return dow === 0 || dow === 6;
+const WEEKDAY_FULL_NAMES = {
+  pt: ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"],
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+};
+
+function isWeekend(dayOfWeek: number) {
+  return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
-function monthLabel(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
+function monthLabel(date: Date, locale: "pt" | "en") {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pt-BR", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
 }
 
-function buildMonthMeta(anchorMonth: Date, todayISO: string) {
+function buildMonthMeta(anchorMonth: Date, todayISO: string, locale: "pt" | "en") {
   const start = startOfMonth(anchorMonth);
   const end = endOfMonth(anchorMonth);
 
@@ -43,8 +54,8 @@ function buildMonthMeta(anchorMonth: Date, todayISO: string) {
     days.push({
       iso,
       day: date.getDate(),
-      initial: WEEKDAY_INITIAL_PT[dow] ?? "",
-      full: WEEKDAY_FULL_PT[dow] ?? "",
+      initial: WEEKDAY_INITIALS[locale][dow] ?? "",
+      full: WEEKDAY_FULL_NAMES[locale][dow] ?? "",
       weekend: isWeekend(dow),
       isToday: iso === todayISO,
     });
@@ -52,7 +63,7 @@ function buildMonthMeta(anchorMonth: Date, todayISO: string) {
     date.setDate(date.getDate() + 1);
   }
 
-  return { start, end, label: monthLabel(start), days };
+  return { start, end, label: monthLabel(start, locale), days };
 }
 
 function monthsInRange(start: Date, end: Date) {
@@ -78,6 +89,7 @@ function MonthCard({
   completionMap,
   onToggle,
   todayISO,
+  locale,
 }: {
   label: string;
   days: {
@@ -92,6 +104,7 @@ function MonthCard({
   completionMap: HabitCompletionMap;
   onToggle: (habitId: string, dateISO: string) => void;
   todayISO: string;
+  locale: "pt" | "en";
 }) {
   const totalDays = days.length;
 
@@ -99,7 +112,9 @@ function MonthCard({
     <div className="overflow-hidden rounded-2xl border bg-white">
       <div className="border-b bg-white px-4 py-3">
         <div className="text-sm font-semibold capitalize text-zinc-900">{label}</div>
-        <div className="mt-0.5 text-xs text-zinc-600">Clique para alternar entre concluido, parcial e nao realizado.</div>
+        <div className="mt-0.5 text-xs text-zinc-600">
+          {locale === "en" ? "Click to switch between done, partial, and clear." : "Clique para alternar entre concluido, parcial e limpar."}
+        </div>
       </div>
 
       <div
@@ -124,10 +139,20 @@ function MonthCard({
               title={`${day.full} (${day.iso})`}
             >
               <div className="flex flex-col items-center justify-center py-2 leading-none">
-                <div className={["text-[11px] font-semibold", day.isToday ? "text-emerald-700" : day.weekend ? "text-amber-700" : "text-zinc-900"].join(" ")}>
+                <div
+                  className={[
+                    "text-[11px] font-semibold",
+                    day.isToday ? "text-emerald-700" : day.weekend ? "text-amber-700" : "text-zinc-900",
+                  ].join(" ")}
+                >
                   {day.day}
                 </div>
-                <div className={["mt-1 text-[10px]", day.isToday ? "font-bold text-emerald-700" : day.weekend ? "font-medium text-amber-600" : "text-zinc-600"].join(" ")}>
+                <div
+                  className={[
+                    "mt-1 text-[10px]",
+                    day.isToday ? "font-bold text-emerald-700" : day.weekend ? "font-medium text-amber-600" : "text-zinc-600",
+                  ].join(" ")}
+                >
                   {day.initial}
                 </div>
               </div>
@@ -147,7 +172,7 @@ function MonthCard({
                 color={habit.color}
                 canMark={canMarkHabitDate(day.iso, todayISO)}
                 className={[
-                  "relative shrink-0 border-r last:border-r-0 flex items-center justify-center",
+                  "relative flex shrink-0 items-center justify-center border-r last:border-r-0",
                   day.isToday ? "bg-emerald-100" : day.weekend ? "bg-amber-100" : "bg-white",
                 ].join(" ")}
                 style={{ width: "var(--cell)", height: "var(--rowH)" }}
@@ -177,9 +202,13 @@ export function HabitMultiMonthGrid({
   onToggle: (habitId: string, dateISO: string) => void;
   mode: "quarter" | "semester" | "year";
 }) {
+  const { locale } = useI18n();
   const todayISO = useMemo(() => toISODate(new Date()), []);
   const months = React.useMemo(() => monthsInRange(start, end), [start, end]);
-  const monthBlocks = React.useMemo(() => months.map((month) => buildMonthMeta(month, todayISO)), [months, todayISO]);
+  const monthBlocks = React.useMemo(
+    () => months.map((month) => buildMonthMeta(month, todayISO, locale)),
+    [locale, months, todayISO]
+  );
 
   const currentMonthKey = useMemo(() => {
     const now = new Date();
@@ -195,7 +224,13 @@ export function HabitMultiMonthGrid({
               {habit.title}
             </div>
             <div className="mt-1 text-xs text-zinc-600">
-              {mode === "year" ? "Ano em meses. Datas futuras ficam apenas como previsao." : "Meses do periodo atual."}
+              {mode === "year"
+                ? locale === "en"
+                  ? "Year split by month. Future dates remain only as forecast."
+                  : "Ano em meses. Datas futuras ficam apenas como previsao."
+                : locale === "en"
+                  ? "Months from the current period."
+                  : "Meses do periodo atual."}
             </div>
           </div>
 
@@ -211,6 +246,7 @@ export function HabitMultiMonthGrid({
                     completionMap={completionMap}
                     onToggle={onToggle}
                     todayISO={todayISO}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -224,8 +260,8 @@ export function HabitMultiMonthGrid({
                     <details key={monthBlock.label} className="group overflow-hidden rounded-2xl border bg-white" open={isCurrentMonth}>
                       <summary className="flex cursor-pointer list-none items-center justify-between border-b px-4 py-3 hover:bg-zinc-50">
                         <div className="text-sm font-semibold capitalize text-zinc-900">{monthBlock.label}</div>
-                        <div className="text-xs text-zinc-600 group-open:hidden">Abrir</div>
-                        <div className="hidden text-xs text-zinc-600 group-open:block">Fechar</div>
+                        <div className="text-xs text-zinc-600 group-open:hidden">{locale === "en" ? "Open" : "Abrir"}</div>
+                        <div className="hidden text-xs text-zinc-600 group-open:block">{locale === "en" ? "Close" : "Fechar"}</div>
                       </summary>
 
                       <div className="p-4">
@@ -236,6 +272,7 @@ export function HabitMultiMonthGrid({
                           completionMap={completionMap}
                           onToggle={onToggle}
                           todayISO={todayISO}
+                          locale={locale}
                         />
                       </div>
                     </details>
@@ -248,7 +285,9 @@ export function HabitMultiMonthGrid({
       ))}
 
       {habits.length === 0 ? (
-        <div className="rounded-2xl border bg-white p-6 text-sm text-zinc-700">Nenhum habito ainda. Va em “Gerenciar” para criar.</div>
+        <div className="rounded-2xl border bg-white p-6 text-sm text-zinc-700">
+          {locale === "en" ? "No habits yet. Go to Manage to create one." : "Nenhum habito ainda. Va em Gerenciar para criar."}
+        </div>
       ) : null}
     </div>
   );

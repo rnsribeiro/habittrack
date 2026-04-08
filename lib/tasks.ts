@@ -1,8 +1,11 @@
 import type { Task, TaskPriority, TaskStatus, TaskType } from "@/lib/types";
+import type { AppLocale } from "@/lib/locale";
+import { intlLocale } from "@/lib/locale";
 
 export const TASK_STATUS_VALUES = ["todo", "in_progress", "done"] as const;
 
 export const UNCATEGORIZED_TASK_LABEL = "Sem categoria";
+export const UNCATEGORIZED_TASK_LABEL_EN = "Uncategorized";
 
 export function isTaskStatus(value: unknown): value is TaskStatus {
   return typeof value === "string" && TASK_STATUS_VALUES.includes(value as TaskStatus);
@@ -21,40 +24,51 @@ export function isTaskDone(task: Pick<Task, "status" | "is_done">) {
   return getTaskStatus(task) === "done";
 }
 
-export function taskStatusLabel(value: TaskStatus | Pick<Task, "status" | "is_done">) {
+export function taskStatusLabel(
+  value: TaskStatus | Pick<Task, "status" | "is_done">,
+  locale: AppLocale = "pt"
+) {
   const status = typeof value === "string" ? value : getTaskStatus(value);
 
-  if (status === "in_progress") return "Em andamento";
-  if (status === "done") return "Concluida";
-  return "A fazer";
+  if (status === "in_progress") return locale === "en" ? "In progress" : "Em andamento";
+  if (status === "done") return locale === "en" ? "Done" : "Concluida";
+  return locale === "en" ? "To do" : "A fazer";
 }
 
-export function taskStatusDescription(status: TaskStatus) {
-  if (status === "in_progress") return "Ja foi iniciada e precisa de continuidade.";
-  if (status === "done") return "Concluida e fora da fila principal.";
-  return "Ainda nao foi iniciada.";
+export function taskStatusDescription(status: TaskStatus, locale: AppLocale = "pt") {
+  if (status === "in_progress") {
+    return locale === "en"
+      ? "Already started and still needs follow-through."
+      : "Ja foi iniciada e precisa de continuidade.";
+  }
+
+  if (status === "done") {
+    return locale === "en" ? "Completed and out of the main queue." : "Concluida e fora da fila principal.";
+  }
+
+  return locale === "en" ? "It has not been started yet." : "Ainda nao foi iniciada.";
 }
 
-export function formatTaskDateBR(isoDate: string) {
+export function formatTaskDateBR(isoDate: string, locale: AppLocale = "pt") {
   const [year, month, day] = isoDate.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(year, month - 1, day));
+  return new Intl.DateTimeFormat(intlLocale(locale)).format(new Date(year, month - 1, day));
 }
 
-export function formatTaskDateTimeBR(iso: string) {
+export function formatTaskDateTimeBR(iso: string, locale: AppLocale = "pt") {
   const date = new Date(iso);
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
-export function priorityLabel(priority: TaskPriority) {
-  if (priority === "high") return "Alta";
-  if (priority === "low") return "Baixa";
-  return "Media";
+export function priorityLabel(priority: TaskPriority, locale: AppLocale = "pt") {
+  if (priority === "high") return locale === "en" ? "High" : "Alta";
+  if (priority === "low") return locale === "en" ? "Low" : "Baixa";
+  return locale === "en" ? "Medium" : "Media";
 }
 
-export function typeLabel(type: TaskType) {
-  if (type === "due") return "Prazo";
-  if (type === "scheduled") return "Agendada";
-  return "Flexivel";
+export function typeLabel(type: TaskType, locale: AppLocale = "pt") {
+  if (type === "due") return locale === "en" ? "Deadline" : "Prazo";
+  if (type === "scheduled") return locale === "en" ? "Scheduled" : "Agendada";
+  return locale === "en" ? "Flexible" : "Flexivel";
 }
 
 export function normalizeTaskCategory(category: string | null | undefined) {
@@ -62,8 +76,8 @@ export function normalizeTaskCategory(category: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function taskCategoryLabel(category: string | null | undefined) {
-  return normalizeTaskCategory(category) ?? UNCATEGORIZED_TASK_LABEL;
+export function taskCategoryLabel(category: string | null | undefined, locale: AppLocale = "pt") {
+  return normalizeTaskCategory(category) ?? (locale === "en" ? UNCATEGORIZED_TASK_LABEL_EN : UNCATEGORIZED_TASK_LABEL);
 }
 
 export function isTaskOverdue(task: Task, now: Date = new Date()) {
@@ -150,14 +164,18 @@ export function compareTasksByUrgency(a: Task, b: Task) {
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 }
 
-export function taskWhenLabel(task: Task) {
+export function taskWhenLabel(task: Task, locale: AppLocale = "pt") {
   if (task.task_type === "due" && task.due_date) {
-    return `Prazo: ${formatTaskDateBR(task.due_date)}`;
+    return locale === "en"
+      ? `Due: ${formatTaskDateBR(task.due_date, locale)}`
+      : `Prazo: ${formatTaskDateBR(task.due_date, locale)}`;
   }
 
   if (task.task_type === "scheduled" && task.scheduled_at) {
-    return `Agendada: ${formatTaskDateTimeBR(task.scheduled_at)}`;
+    return locale === "en"
+      ? `Scheduled: ${formatTaskDateTimeBR(task.scheduled_at, locale)}`
+      : `Agendada: ${formatTaskDateTimeBR(task.scheduled_at, locale)}`;
   }
 
-  return "Sem data definida";
+  return locale === "en" ? "No date set" : "Sem data definida";
 }

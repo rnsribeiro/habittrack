@@ -9,12 +9,12 @@ export function toISODate(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-// Semana começando na segunda (pt-BR)
+// Semana comecando na segunda
 export function startOfWeek(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0 dom..6 sab
-  const diff = day === 0 ? -6 : 1 - day; // segunda
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d;
 }
@@ -107,7 +107,6 @@ export function getPeriodRange(anchor: Date, period: Period) {
   return { start, end };
 }
 
-// move o anchor para o período anterior/próximo
 export function shiftAnchor(anchor: Date, period: Period, delta: number) {
   const d = new Date(anchor);
   d.setHours(0, 0, 0, 0);
@@ -121,17 +120,18 @@ export function shiftAnchor(anchor: Date, period: Period, delta: number) {
   return d;
 }
 
-export function formatRangeLabel(period: Period, anchor: Date) {
+export function formatRangeLabel(period: Period, anchor: Date, locale: "pt" | "en" = "pt") {
   const { start, end } = getPeriodRange(anchor, period);
+  const intlLocale = locale === "en" ? "en-US" : "pt-BR";
 
-  const fmt = new Intl.DateTimeFormat("pt-BR", {
+  const fmt = new Intl.DateTimeFormat(intlLocale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
 
   if (period === "month") {
-    return new Intl.DateTimeFormat("pt-BR", {
+    return new Intl.DateTimeFormat(intlLocale, {
       month: "long",
       year: "numeric",
     }).format(start);
@@ -139,18 +139,17 @@ export function formatRangeLabel(period: Period, anchor: Date) {
 
   if (period === "quarter") {
     const q = Math.floor(start.getMonth() / 3) + 1;
-    return `T${q} de ${start.getFullYear()}`;
+    return locale === "en" ? `Q${q} ${start.getFullYear()}` : `T${q} de ${start.getFullYear()}`;
   }
 
   if (period === "semester") {
     const s = start.getMonth() === 0 ? 1 : 2;
-    return `${s}º semestre de ${start.getFullYear()}`;
+    return locale === "en" ? `${s}${s === 1 ? "st" : "nd"} semester ${start.getFullYear()}` : `${s} semestre de ${start.getFullYear()}`;
   }
 
   if (period === "year") {
     return String(start.getFullYear());
   }
 
-  // week
-  return `${fmt.format(start)} — ${fmt.format(end)}`;
+  return `${fmt.format(start)} - ${fmt.format(end)}`;
 }

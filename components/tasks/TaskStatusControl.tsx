@@ -1,6 +1,7 @@
 "use client";
 
 import type { TaskStatus } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 import { taskStatusDescription, taskStatusLabel } from "@/lib/tasks";
 
 const STATUS_STYLES: Record<
@@ -39,6 +40,7 @@ export function TaskStatusControl({
   showDescription = false,
   className = "",
 }: TaskStatusControlProps) {
+  const { locale } = useI18n();
   const layoutClassName = showDescription ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-3";
 
   return (
@@ -61,12 +63,12 @@ export function TaskStatusControl({
           >
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${active ? styles.dot : "bg-slate-300"}`} />
-              <span className="text-sm font-semibold">{taskStatusLabel(status)}</span>
+              <span className="text-sm font-semibold">{taskStatusLabel(status, locale)}</span>
             </div>
 
             {showDescription ? (
               <p className={`mt-2 text-xs leading-5 ${active ? "text-current/90" : "text-slate-500"}`}>
-                {taskStatusDescription(status)}
+                {taskStatusDescription(status, locale)}
               </p>
             ) : null}
           </button>

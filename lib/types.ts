@@ -82,3 +82,14 @@ export type ReadingSession = {
   created_at: string;
 };
 
+export type ManagedUser = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  last_sign_in_at: string | null;
+  created_at: string;
+  blocked_until: string | null;
+  is_blocked: boolean;
+  is_current_user: boolean;
+};
+

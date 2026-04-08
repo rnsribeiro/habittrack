@@ -1,19 +1,27 @@
 "use client";
 
 import React from "react";
+import { useI18n } from "@/lib/i18n";
 import { canMarkHabitDate, type HabitCompletionMap } from "@/lib/habits";
 import type { Habit } from "@/lib/types";
 import { toISODate } from "@/src/lib/period";
 import { HabitCompletionCell } from "@/components/habits/HabitCompletionCell";
 
-const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-const WEEKDAY_FULL_PT = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
+const WEEKDAY_INITIALS = {
+  pt: ["D", "S", "T", "Q", "Q", "S", "S"],
+  en: ["S", "M", "T", "W", "T", "F", "S"],
+};
+
+const WEEKDAY_FULL_NAMES = {
+  pt: ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"],
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+};
 
 function isWeekend(dow: number) {
   return dow === 0 || dow === 6;
 }
 
-function eachDayMeta(start: Date, end: Date, todayISO: string) {
+function eachDayMeta(start: Date, end: Date, todayISO: string, locale: "pt" | "en") {
   const result: {
     iso: string;
     day: number;
@@ -36,8 +44,8 @@ function eachDayMeta(start: Date, end: Date, todayISO: string) {
     result.push({
       iso,
       day: date.getDate(),
-      initial: WEEKDAY_INITIAL_PT[dow] ?? "",
-      full: WEEKDAY_FULL_PT[dow] ?? "",
+      initial: WEEKDAY_INITIALS[locale][dow] ?? "",
+      full: WEEKDAY_FULL_NAMES[locale][dow] ?? "",
       weekend: isWeekend(dow),
       isToday: iso === todayISO,
     });
@@ -63,8 +71,9 @@ export function HabitRangeGrid({
   onToggle: (habitId: string, dateISO: string) => void;
   compact?: boolean;
 }) {
+  const { locale } = useI18n();
   const todayISO = React.useMemo(() => toISODate(new Date()), []);
-  const meta = React.useMemo(() => eachDayMeta(start, end, todayISO), [start, end, todayISO]);
+  const meta = React.useMemo(() => eachDayMeta(start, end, todayISO, locale), [locale, start, end, todayISO]);
   const totalDays = meta.length;
 
   return (
@@ -82,7 +91,7 @@ export function HabitRangeGrid({
       <div className="sticky top-0 z-20 border-b bg-white">
         <div className="flex">
           <div className="sticky left-0 z-30 shrink-0 border-r bg-zinc-300 p-3 font-semibold" style={{ width: "var(--firstCol)" }}>
-            <span className={`font-bold text-black ${compact ? "text-sm" : ""}`}>Habitos</span>
+            <span className={`font-bold text-black ${compact ? "text-sm" : ""}`}>{locale === "en" ? "Habits" : "Habitos"}</span>
           </div>
 
           {meta.map((item) => (

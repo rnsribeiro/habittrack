@@ -1,13 +1,21 @@
 "use client";
 
 import React from "react";
+import { useI18n } from "@/lib/i18n";
 import { canMarkHabitDate, type HabitCompletionMap } from "@/lib/habits";
 import { daysInMonth, fmtDate } from "@/lib/dates";
 import type { Habit } from "@/lib/types";
 import { HabitCompletionCell } from "@/components/habits/HabitCompletionCell";
 
-const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-const WEEKDAY_FULL_PT = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
+const WEEKDAY_INITIALS = {
+  pt: ["D", "S", "T", "Q", "Q", "S", "S"],
+  en: ["S", "M", "T", "W", "T", "F", "S"],
+};
+
+const WEEKDAY_FULL_NAMES = {
+  pt: ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"],
+  en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+};
 
 function isWeekend(dayOfWeek: number) {
   return dayOfWeek === 0 || dayOfWeek === 6;
@@ -26,6 +34,7 @@ export function HabitMonthGrid({
   monthIndex0: number;
   onToggle: (habitId: string, date: string) => void;
 }) {
+  const { locale } = useI18n();
   const totalDays = daysInMonth(year, monthIndex0);
   const days = Array.from({ length: totalDays }, (_, index) => index + 1);
 
@@ -41,8 +50,8 @@ export function HabitMonthGrid({
       dateISO,
       day,
       weekend: isWeekend(dayOfWeek),
-      initial: WEEKDAY_INITIAL_PT[dayOfWeek] ?? "",
-      full: WEEKDAY_FULL_PT[dayOfWeek] ?? "",
+      initial: WEEKDAY_INITIALS[locale][dayOfWeek] ?? "",
+      full: WEEKDAY_FULL_NAMES[locale][dayOfWeek] ?? "",
       isToday: dateISO === todayISO,
     };
   });
@@ -62,27 +71,35 @@ export function HabitMonthGrid({
       <div className="sticky top-0 z-20 border-b bg-white">
         <div className="flex">
           <div className="sticky left-0 z-30 shrink-0 border-r bg-zinc-300 p-3 font-semibold" style={{ width: "var(--firstCol)" }}>
-            <span className="font-bold text-black">Habitos</span>
+            <span className="font-bold text-black">{locale === "en" ? "Habits" : "Habitos"}</span>
           </div>
 
           {dayMeta.map((meta) => (
             <div
               key={meta.day}
-              className={["shrink-0 border-r text-zinc-700", meta.weekend ? "bg-amber-100" : "bg-white"].join(" ")}
+              className={[
+                "shrink-0 border-r text-zinc-700",
+                meta.isToday ? "bg-emerald-100" : meta.weekend ? "bg-amber-100" : "bg-white",
+              ].join(" ")}
               style={{ width: "var(--cell)" }}
-              title={`${meta.full} (dia ${meta.day})`}
+              title={`${meta.full} (${meta.day})`}
             >
               <div className="flex flex-col items-center justify-center py-2 leading-none">
                 <div
                   className={[
                     "text-[11px] font-semibold",
-                    meta.isToday ? "rounded-full bg-black px-2 py-[2px] text-white" : meta.weekend ? "text-amber-700" : "text-zinc-800",
+                    meta.isToday ? "text-emerald-700" : meta.weekend ? "text-amber-700" : "text-zinc-800",
                   ].join(" ")}
                 >
                   {meta.day}
                 </div>
 
-                <div className={["mt-1 text-[10px]", meta.weekend ? "font-medium text-amber-600" : "text-zinc-600"].join(" ")}>
+                <div
+                  className={[
+                    "mt-1 text-[10px]",
+                    meta.isToday ? "font-bold text-emerald-700" : meta.weekend ? "font-medium text-amber-600" : "text-zinc-600",
+                  ].join(" ")}
+                >
                   {meta.initial}
                 </div>
               </div>
@@ -111,9 +128,8 @@ export function HabitMonthGrid({
                   color={habit.color}
                   canMark={canMarkHabitDate(meta.dateISO, todayISO)}
                   className={[
-                    "relative shrink-0 border-r flex items-center justify-center",
-                    meta.weekend ? "bg-amber-100" : "bg-white",
-                    meta.isToday ? "z-[1]" : "",
+                    "relative flex shrink-0 items-center justify-center border-r",
+                    meta.isToday ? "bg-emerald-100" : meta.weekend ? "bg-amber-100" : "bg-white",
                   ].join(" ")}
                   style={{ width: "var(--cell)", height: "var(--rowH)" }}
                   onClick={() => onToggle(habit.id, meta.dateISO)}
@@ -124,7 +140,11 @@ export function HabitMonthGrid({
           </div>
         ))}
 
-        {habits.length === 0 ? <div className="p-6 text-sm text-zinc-600">Nenhum habito ainda. Va em “Gerenciar” para criar.</div> : null}
+        {habits.length === 0 ? (
+          <div className="p-6 text-sm text-zinc-600">
+            {locale === "en" ? "No habits yet. Go to Manage to create one." : "Nenhum habito ainda. Va em Gerenciar para criar."}
+          </div>
+        ) : null}
       </div>
     </div>
   );

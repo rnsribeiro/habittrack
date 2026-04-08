@@ -1,8 +1,12 @@
 import { daysInMonth, fmtDate } from "@/lib/dates";
 import type { HabitCompletionMap } from "@/lib/habits";
+import { intlLocale, type AppLocale } from "@/lib/locale";
 import type { Habit, HabitCompletionStatus } from "@/lib/types";
 
-const WEEKDAY_INITIAL_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
+const WEEKDAY_INITIALS: Record<AppLocale, string[]> = {
+  pt: ["D", "S", "T", "Q", "Q", "S", "S"],
+  en: ["S", "M", "T", "W", "T", "F", "S"],
+};
 
 export type HabitMonthExportFormat = "svg" | "png" | "pdf";
 
@@ -34,11 +38,11 @@ function escapeXml(value: string) {
     .replaceAll("'", "&apos;");
 }
 
-function monthLabel(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(date);
+function monthLabel(date: Date, locale: AppLocale) {
+  return new Intl.DateTimeFormat(intlLocale(locale), { month: "long", year: "numeric" }).format(date);
 }
 
-function buildMonthMeta(anchor: Date) {
+function buildMonthMeta(anchor: Date, locale: AppLocale) {
   const year = anchor.getFullYear();
   const monthIndex0 = anchor.getMonth();
   const totalDays = daysInMonth(year, monthIndex0);
@@ -54,7 +58,7 @@ function buildMonthMeta(anchor: Date) {
     return {
       dateISO,
       day,
-      initial: WEEKDAY_INITIAL_PT[dow] ?? "",
+      initial: WEEKDAY_INITIALS[locale][dow] ?? "",
       weekend: dow === 0 || dow === 6,
       isToday: dateISO === todayISO,
     };
@@ -63,39 +67,32 @@ function buildMonthMeta(anchor: Date) {
   const monthValue = String(monthIndex0 + 1).padStart(2, "0");
 
   return {
-    label: monthLabel(anchor),
-    todayISO,
+    label: monthLabel(anchor, locale),
     year,
     monthIndex0,
     days,
-    filenameBase: `habitos-${year}-${monthValue}`,
+    filenameBase: `${locale === "en" ? "habits" : "habitos"}-${year}-${monthValue}`,
   };
 }
 
 function statusMarkup(status: HabitCompletionStatus | null, color: string, x: number, y: number, size: number) {
+  const normalizedStatus = status === "missed" ? null : status;
   const inset = 1;
   const innerX = x + inset;
   const innerY = y + inset;
   const innerSize = size - inset * 2;
 
-  if (status === "done") {
+  if (normalizedStatus === "done") {
     return [
       `<rect x="${innerX}" y="${innerY}" width="${innerSize}" height="${innerSize}" rx="5" fill="${color}" stroke="${color}" />`,
-      `<text x="${x + size / 2}" y="${y + size / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">✓</text>`,
+      `<text x="${x + size / 2}" y="${y + size / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">&#10003;</text>`,
     ].join("");
   }
 
-  if (status === "partial") {
+  if (normalizedStatus === "partial") {
     return [
       `<rect x="${innerX}" y="${innerY}" width="${innerSize}" height="${innerSize}" rx="5" fill="#ffffff" stroke="${color}" />`,
       `<rect x="${innerX}" y="${innerY}" width="${Math.floor(innerSize / 2)}" height="${innerSize}" fill="${color}" />`,
-    ].join("");
-  }
-
-  if (status === "missed") {
-    return [
-      `<rect x="${innerX}" y="${innerY}" width="${innerSize}" height="${innerSize}" rx="5" fill="#fff1f2" stroke="#ef4444" />`,
-      `<text x="${x + size / 2}" y="${y + size / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626">x</text>`,
     ].join("");
   }
 
@@ -106,12 +103,14 @@ export function createHabitMonthSvg({
   anchor,
   habits,
   completionMap,
+  locale = "pt",
 }: {
   anchor: Date;
   habits: Habit[];
   completionMap: HabitCompletionMap;
+  locale?: AppLocale;
 }): SvgResult {
-  const month = buildMonthMeta(anchor);
+  const month = buildMonthMeta(anchor, locale);
   const pagePadding = 28;
   const titleHeight = 36;
   const subtitleHeight = 20;
@@ -132,10 +131,9 @@ export function createHabitMonthSvg({
   const tableY = pagePadding + titleHeight + subtitleHeight + legendHeight;
 
   const legendItems = [
-    { label: "Concluido", color: "#22c55e", status: "done" as const },
-    { label: "Parcial", color: "#22c55e", status: "partial" as const },
-    { label: "Nao realizado", color: "#ef4444", status: "missed" as const },
-    { label: "Sem marcacao", color: "#94a3b8", status: null },
+    { label: locale === "en" ? "Done" : "Concluido", color: "#22c55e", status: "done" as const },
+    { label: locale === "en" ? "Partial" : "Parcial", color: "#22c55e", status: "partial" as const },
+    { label: locale === "en" ? "Not marked" : "Sem marcacao", color: "#94a3b8", status: null },
   ];
 
   const columnBackgrounds = month.days
@@ -169,7 +167,8 @@ export function createHabitMonthSvg({
               const markerSize = 16;
               const markerX = x + (cellSize - markerSize) / 2;
               const markerY = rowY + (rowHeight - markerSize) / 2;
-              const status = completionMap[`${habit.id}:${day.dateISO}`] ?? null;
+              const rawStatus = completionMap[`${habit.id}:${day.dateISO}`] ?? null;
+              const status = rawStatus === "missed" ? null : rawStatus;
 
               return [
                 `<rect x="${x}" y="${rowY}" width="${cellSize}" height="${rowHeight}" fill="transparent" stroke="#e2e8f0" />`,
@@ -187,7 +186,9 @@ export function createHabitMonthSvg({
         .join("")
     : [
         `<rect x="${tableX}" y="${tableY + tableHeaderHeight}" width="${tableWidth}" height="${rowHeight}" fill="#ffffff" stroke="#e2e8f0" />`,
-        `<text x="${tableX + 16}" y="${tableY + tableHeaderHeight + 25}" font-size="13" fill="#475569">Nenhum habito cadastrado neste momento.</text>`,
+        `<text x="${tableX + 16}" y="${tableY + tableHeaderHeight + 25}" font-size="13" fill="#475569">${
+          locale === "en" ? "No habits created yet." : "Nenhum habito cadastrado neste momento."
+        }</text>`,
       ].join("");
 
   const legend = legendItems
@@ -204,13 +205,19 @@ export function createHabitMonthSvg({
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none">`,
     `<rect width="${width}" height="${height}" rx="28" fill="#f8fafc" />`,
-    `<text x="${pagePadding}" y="${pagePadding + 6}" font-size="24" font-weight="700" fill="#0f172a">Tabela de Habitos</text>`,
-    `<text x="${pagePadding}" y="${pagePadding + 28}" font-size="14" fill="#475569">Mes exportado: ${escapeXml(month.label)}</text>`,
+    `<text x="${pagePadding}" y="${pagePadding + 6}" font-size="24" font-weight="700" fill="#0f172a">${
+      locale === "en" ? "Habits Table" : "Tabela de Habitos"
+    }</text>`,
+    `<text x="${pagePadding}" y="${pagePadding + 28}" font-size="14" fill="#475569">${
+      locale === "en" ? "Exported month" : "Mes exportado"
+    }: ${escapeXml(month.label)}</text>`,
     legend,
     `<rect x="${tableX}" y="${tableY}" width="${tableWidth}" height="${tableHeight}" rx="${tableRadius}" fill="#ffffff" stroke="#cbd5e1" />`,
     columnBackgrounds,
     `<rect x="${tableX}" y="${tableY}" width="${firstColWidth}" height="${tableHeaderHeight}" fill="#e5e7eb" stroke="#cbd5e1" />`,
-    `<text x="${tableX + 16}" y="${tableY + 31}" font-size="15" font-weight="700" fill="#111827">Habitos</text>`,
+    `<text x="${tableX + 16}" y="${tableY + 31}" font-size="15" font-weight="700" fill="#111827">${
+      locale === "en" ? "Habits" : "Habitos"
+    }</text>`,
     headerCells,
     rows,
     `</svg>`,
@@ -270,16 +277,19 @@ export async function downloadHabitMonthExport({
   habits,
   completionMap,
   format,
+  locale = "pt",
 }: {
   anchor: Date;
   habits: Habit[];
   completionMap: HabitCompletionMap;
   format: HabitMonthExportFormat;
+  locale?: AppLocale;
 }) {
   const { svg, width, height, filenameBase } = createHabitMonthSvg({
     anchor,
     habits,
     completionMap,
+    locale,
   });
 
   if (format === "svg") {
