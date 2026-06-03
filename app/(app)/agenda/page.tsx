@@ -84,9 +84,30 @@ function eventStartsOnDay(event: CalendarEvent, day: Date) {
 
 function statusLabel(status: CalendarEventStatus, locale: "pt" | "en") {
   if (locale === "en") {
-    return status === "done" ? "Done" : status === "canceled" ? "Canceled" : "Planned";
+    return status === "done" ? "Done" : status === "canceled" ? "Not done" : "Pending";
   }
-  return status === "done" ? "Concluida" : status === "canceled" ? "Cancelada" : "Planejada";
+  return status === "done" ? "Concluida" : status === "canceled" ? "Nao concluida" : "Pendente";
+}
+
+function statusMarker(status: CalendarEventStatus) {
+  if (status === "done") {
+    return {
+      label: "✓",
+      className: "border-emerald-200 bg-emerald-100 text-emerald-700",
+    };
+  }
+
+  if (status === "canceled") {
+    return {
+      label: "×",
+      className: "border-red-200 bg-red-100 text-red-700",
+    };
+  }
+
+  return {
+    label: "!",
+    className: "border-amber-200 bg-amber-100 text-amber-700",
+  };
 }
 
 function formatEventTime(event: CalendarEvent, locale: "pt" | "en") {
@@ -455,6 +476,8 @@ export default function AgendaPage() {
   }
 
   function renderEventCard(event: CalendarEvent) {
+    const marker = statusMarker(event.status);
+
     return (
       <article
         key={event.id}
@@ -470,11 +493,16 @@ export default function AgendaPage() {
         className={`flex h-full cursor-pointer flex-col rounded-[18px] border p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${eventTone(event.status)}`}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className={`text-left text-sm font-semibold hover:text-emerald-700 ${event.status === "canceled" ? "line-through" : ""}`}>
-              {event.title}
+          <div className="flex min-w-0 items-start gap-2">
+            <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${marker.className}`}>
+              {marker.label}
+            </span>
+            <div className="min-w-0">
+              <div className={`text-left text-sm font-semibold hover:text-emerald-700 ${event.status === "canceled" ? "line-through" : ""}`}>
+                {event.title}
+              </div>
+              <div className="mt-1 text-xs font-medium text-slate-500">{formatEventTime(event, locale)}</div>
             </div>
-            <div className="mt-1 text-xs font-medium text-slate-500">{formatEventTime(event, locale)}</div>
           </div>
           <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: event.color }} />
         </div>
@@ -614,26 +642,38 @@ export default function AgendaPage() {
 
                   <div className="mt-3 space-y-2">
                     {dayEvents.slice(0, view === "month" ? 3 : 8).map((event) => (
-                      <div
-                        key={event.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={(clickEvent) => {
-                          clickEvent.stopPropagation();
-                          startEditing(event);
-                        }}
-                        onKeyDown={(keyboardEvent) => {
-                          if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
-                            keyboardEvent.preventDefault();
-                            keyboardEvent.stopPropagation();
-                            startEditing(event);
-                          }
-                        }}
-                        className="truncate rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
-                      >
-                        <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: event.color }} />
-                        <span className={event.status === "canceled" ? "line-through" : ""}>{formatEventTime(event, locale)} {event.title}</span>
-                      </div>
+                      (() => {
+                        const marker = statusMarker(event.status);
+
+                        return (
+                          <div
+                            key={event.id}
+                            role="button"
+                            tabIndex={0}
+                            title={statusLabel(event.status, locale)}
+                            onClick={(clickEvent) => {
+                              clickEvent.stopPropagation();
+                              startEditing(event);
+                            }}
+                            onKeyDown={(keyboardEvent) => {
+                              if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+                                keyboardEvent.preventDefault();
+                                keyboardEvent.stopPropagation();
+                                startEditing(event);
+                              }
+                            }}
+                            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50"
+                          >
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[0.68rem] font-bold ${marker.className}`}>
+                              {marker.label}
+                            </span>
+                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: event.color }} />
+                            <span className={`min-w-0 truncate ${event.status === "canceled" ? "line-through" : ""}`}>
+                              {formatEventTime(event, locale)} {event.title}
+                            </span>
+                          </div>
+                        );
+                      })()
                     ))}
                     {dayEvents.length > (view === "month" ? 3 : 8) ? (
                       <div className="text-xs font-semibold text-slate-500">+{dayEvents.length - (view === "month" ? 3 : 8)}</div>

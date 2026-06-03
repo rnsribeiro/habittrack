@@ -97,11 +97,11 @@ export function SiteHeader() {
 
             <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:gap-2">
               <NavButton href="/habits" label={copy.habits} />
-              <NavButton href="/dashboard" label={copy.dashboard} />
-              <NavButton href="/manage" label={copy.manage} />
-              <NavButton href="/tasks" label={copy.tasks} />
               <NavButton href="/agenda" label={copy.agenda} />
               <NavButton href="/reading" label={copy.reading} />
+              <NavButton href="/tasks" label={copy.tasks} />
+              <NavButton href="/dashboard" label={copy.dashboard} />
+              <NavButton href="/manage" label={copy.manage} />
               <LocaleToggle />
               <button onClick={logout} className="ht-btn ht-btn-danger">
                 {copy.signOut}
@@ -122,11 +122,11 @@ export function SiteHeader() {
           <div id="mobile-site-menu" className={`${mobileMenuOpen ? "mt-4 flex" : "hidden"} flex-col gap-2 lg:hidden`}>
             <LocaleToggle className="mb-2" />
             <NavButton href="/habits" label={copy.habits} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
-            <NavButton href="/dashboard" label={copy.dashboard} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
-            <NavButton href="/manage" label={copy.manage} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
-            <NavButton href="/tasks" label={copy.tasks} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <NavButton href="/agenda" label={copy.agenda} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <NavButton href="/reading" label={copy.reading} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
+            <NavButton href="/tasks" label={copy.tasks} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
+            <NavButton href="/dashboard" label={copy.dashboard} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
+            <NavButton href="/manage" label={copy.manage} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <button onClick={logout} className="ht-btn ht-btn-danger w-full justify-start">
               {copy.signOut}
             </button>
