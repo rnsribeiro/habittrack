@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+type BookPagesRow = {
+  total_pages: number | null;
+};
+
 function getToken(req: NextRequest) {
   const h = req.headers.get("authorization") || "";
   return h.startsWith("Bearer ") ? h.slice(7) : null;
@@ -41,7 +45,10 @@ export async function GET(req: NextRequest) {
 
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
 
-  const pages_in_period = (finishedPeriod ?? []).reduce((acc, b: any) => acc + (b.total_pages ?? 0), 0);
+  const pages_in_period = (finishedPeriod ?? []).reduce(
+    (acc, b: BookPagesRow) => acc + (b.total_pages ?? 0),
+    0
+  );
   const finished_in_period = (finishedPeriod ?? []).length;
 
   // total geral concluído
@@ -53,7 +60,10 @@ export async function GET(req: NextRequest) {
 
   if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
 
-  const pages_total = (finishedAll ?? []).reduce((acc, b: any) => acc + (b.total_pages ?? 0), 0);
+  const pages_total = (finishedAll ?? []).reduce(
+    (acc, b: BookPagesRow) => acc + (b.total_pages ?? 0),
+    0
+  );
 
   return NextResponse.json({
     pages_in_period,

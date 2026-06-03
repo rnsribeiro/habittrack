@@ -16,9 +16,8 @@ function supaFromToken(token: string) {
 
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 async function getId(ctx: Ctx) {
-  const p: any = (ctx as any).params;
-  const resolved = typeof p?.then === "function" ? await p : p;
-  return resolved.id as string;
+  const resolved = await ctx.params;
+  return resolved.id;
 }
 
 export async function POST(req: NextRequest, ctx: Ctx) {

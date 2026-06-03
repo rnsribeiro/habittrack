@@ -50,6 +50,27 @@ export type Task = {
   updated_at: string;
 };
 
+export type CalendarEventStatus = "planned" | "done" | "canceled";
+
+export type CalendarEvent = {
+  id: string;
+  user_id: string;
+
+  title: string;
+  notes: string | null;
+  location: string | null;
+  category: string | null;
+  color: string;
+
+  start_at: string;
+  end_at: string | null;
+  all_day: boolean;
+  status: CalendarEventStatus;
+
+  created_at: string;
+  updated_at: string;
+};
+
 export type BookStatus = "reading" | "finished" | "abandoned";
 
 export type Book = {

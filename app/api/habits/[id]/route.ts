@@ -19,9 +19,8 @@ function supaFromToken(token: string) {
 type Ctx = { params: { id: string } | Promise<{ id: string }> };
 
 async function getId(ctx: Ctx) {
-  const p: any = (ctx as any).params;
-  const resolved = typeof p?.then === "function" ? await p : p;
-  return resolved.id as string;
+  const resolved = await ctx.params;
+  return resolved.id;
 }
 
 export async function GET(req: NextRequest, ctx: Ctx) {
@@ -61,7 +60,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if (!userRes?.user) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
 
   // Campos permitidos
-  const payload: any = {};
+  const payload: Record<string, string> = {};
   if (typeof body.title === "string") payload.title = body.title;
   if (typeof body.color === "string") payload.color = body.color;
 

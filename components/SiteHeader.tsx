@@ -61,6 +61,7 @@ export function SiteHeader() {
           dashboard: "Dashboard",
           manage: "Manage",
           tasks: "Tasks",
+          agenda: "Agenda",
           reading: "Reading",
           signOut: "Sign out",
           menu: "Menu",
@@ -72,6 +73,7 @@ export function SiteHeader() {
           dashboard: "Dashboard",
           manage: "Gerenciar",
           tasks: "Tarefas",
+          agenda: "Agenda",
           reading: "Leitura",
           signOut: "Sair",
           menu: "Menu",
@@ -98,6 +100,7 @@ export function SiteHeader() {
               <NavButton href="/dashboard" label={copy.dashboard} />
               <NavButton href="/manage" label={copy.manage} />
               <NavButton href="/tasks" label={copy.tasks} />
+              <NavButton href="/agenda" label={copy.agenda} />
               <NavButton href="/reading" label={copy.reading} />
               <LocaleToggle />
               <button onClick={logout} className="ht-btn ht-btn-danger">
@@ -122,6 +125,7 @@ export function SiteHeader() {
             <NavButton href="/dashboard" label={copy.dashboard} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <NavButton href="/manage" label={copy.manage} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <NavButton href="/tasks" label={copy.tasks} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
+            <NavButton href="/agenda" label={copy.agenda} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <NavButton href="/reading" label={copy.reading} className="w-full justify-start" onClick={() => setMobileMenuOpen(false)} />
             <button onClick={logout} className="ht-btn ht-btn-danger w-full justify-start">
               {copy.signOut}
