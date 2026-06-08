@@ -208,7 +208,7 @@ export default function AgendaPage() {
           noActivities: "No activities here yet.",
           done: "Done",
           reopen: "Reopen",
-          postpone: "Postpone to tomorrow",
+          postpone: "Postpone",
           cancel: "Cancel",
           delete: "Delete",
           editActions: "Activity actions",
@@ -258,7 +258,7 @@ export default function AgendaPage() {
           noActivities: "Nenhuma atividade aqui por enquanto.",
           done: "Concluir",
           reopen: "Reabrir",
-          postpone: "Adiar para amanha",
+          postpone: "Adiar",
           cancel: "Cancelar",
           delete: "Excluir",
           editActions: "Acoes da atividade",
@@ -897,9 +897,6 @@ export default function AgendaPage() {
                 <div className="mt-3 rounded-[18px] border border-slate-200 bg-white/80 p-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{copy.editActions}</div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm sm:col-span-2" onClick={() => postponeEvent(editing)}>
-                      {copy.postpone}
-                    </button>
                     {editing.status === "done" ? (
                       <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm" onClick={() => updateStatus(editing, "planned")}>
                         {copy.reopen}
@@ -909,6 +906,9 @@ export default function AgendaPage() {
                         {copy.done}
                       </button>
                     )}
+                    <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm" onClick={() => postponeEvent(editing)}>
+                      {copy.postpone}
+                    </button>
                     <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm" onClick={() => updateStatus(editing, "canceled")}>
                       {copy.cancel}
                     </button>
