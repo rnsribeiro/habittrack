@@ -208,6 +208,7 @@ export default function AgendaPage() {
           noActivities: "No activities here yet.",
           done: "Done",
           reopen: "Reopen",
+          postpone: "Postpone to tomorrow",
           cancel: "Cancel",
           delete: "Delete",
           editActions: "Activity actions",
@@ -219,6 +220,7 @@ export default function AgendaPage() {
             end: "End must be after start.",
             create: "Could not create activity.",
             update: "Could not update activity.",
+            postpone: "Could not postpone activity.",
             remove: "Could not delete activity.",
           },
         }
@@ -256,6 +258,7 @@ export default function AgendaPage() {
           noActivities: "Nenhuma atividade aqui por enquanto.",
           done: "Concluir",
           reopen: "Reabrir",
+          postpone: "Adiar para amanha",
           cancel: "Cancelar",
           delete: "Excluir",
           editActions: "Acoes da atividade",
@@ -267,6 +270,7 @@ export default function AgendaPage() {
             end: "O fim deve ser depois do inicio.",
             create: "Erro ao criar atividade.",
             update: "Erro ao atualizar atividade.",
+            postpone: "Erro ao adiar atividade.",
             remove: "Erro ao excluir atividade.",
           },
         };
@@ -457,6 +461,47 @@ export default function AgendaPage() {
     } catch (error: unknown) {
       setEvents(snapshot);
       setErrorMsg(getErrorMessage(error, copy.errors.update));
+    }
+  }
+
+  async function postponeEvent(event: CalendarEvent) {
+    const nextStart = addDays(new Date(event.start_at), 1);
+    const nextEnd = event.end_at ? addDays(new Date(event.end_at), 1) : null;
+    const payload = {
+      start_at: nextStart.toISOString(),
+      end_at: nextEnd ? nextEnd.toISOString() : null,
+    };
+    const optimisticEvent = {
+      ...event,
+      start_at: payload.start_at,
+      end_at: payload.end_at,
+    };
+    const snapshot = events;
+
+    setEvents((current) => current.map((item) => (item.id === event.id ? optimisticEvent : item)));
+    setEditing((current) => (current?.id === event.id ? optimisticEvent : current));
+    setSelectedDate(startOfDay(nextStart));
+    setAnchorDate(startOfDay(nextStart));
+    setStartAt(toDateTimeInputValue(nextStart));
+    setEndAt(nextEnd ? toDateTimeInputValue(nextEnd) : "");
+
+    try {
+      const response = await apiFetch(`/api/calendar-events/${event.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+      setEvents((current) => current.map((item) => (item.id === event.id ? response.event : item)));
+      setEditing((current) => (current?.id === event.id ? response.event : current));
+      setStartAt(toDateTimeInputValue(new Date(response.event.start_at)));
+      setEndAt(response.event.end_at ? toDateTimeInputValue(new Date(response.event.end_at)) : "");
+    } catch (error: unknown) {
+      setEvents(snapshot);
+      setEditing(event);
+      setSelectedDate(startOfDay(new Date(event.start_at)));
+      setAnchorDate(startOfDay(new Date(event.start_at)));
+      setStartAt(toDateTimeInputValue(new Date(event.start_at)));
+      setEndAt(event.end_at ? toDateTimeInputValue(new Date(event.end_at)) : "");
+      setErrorMsg(getErrorMessage(error, copy.errors.postpone));
     }
   }
 
@@ -851,7 +896,10 @@ export default function AgendaPage() {
 
                 <div className="mt-3 rounded-[18px] border border-slate-200 bg-white/80 p-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{copy.editActions}</div>
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm sm:col-span-2" onClick={() => postponeEvent(editing)}>
+                      {copy.postpone}
+                    </button>
                     {editing.status === "done" ? (
                       <button className="app-btn app-btn-secondary min-h-0 w-full py-2 text-sm" onClick={() => updateStatus(editing, "planned")}>
                         {copy.reopen}
